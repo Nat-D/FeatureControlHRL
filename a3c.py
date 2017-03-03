@@ -232,7 +232,16 @@ should be computed.
             grads, _ = tf.clip_by_global_norm(grads, 40.0)
 
             # copy weights from the parameter server to the local model
-            self.sync = tf.group(*[v1.assign(v2) for v1, v2 in zip(pi.var_list, self.network.var_list)])
+            #self.sync = tf.group(*[v1.assign(v2) for v1, v2 in zip(pi.var_list, self.network.var_list)])
+
+            # TODO: For drop-out model, we want to sample from the parameter server
+            # which is dropping out some units
+            self.sync = tf.group(
+                *[ v1.assign(v2)
+                 for v1, v2 in zip(pi.var_list, self.network.var_list)]
+            )
+
+
 
             grads_and_vars = list(zip(grads, self.network.var_list))
             inc_step = self.global_step.assign_add(tf.shape(pi.x)[0])

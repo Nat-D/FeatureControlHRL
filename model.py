@@ -52,7 +52,7 @@ class LSTMPolicy(object):
             x = tf.nn.elu(conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2]))
         # introduce a "fake" batch dimension of 1 after flatten so that we can do LSTM over time dim
         x = tf.expand_dims(flatten(x), [0])
-
+        
         size = 256
         if use_tf100_api:
             lstm = rnn.BasicLSTMCell(size, state_is_tuple=True)

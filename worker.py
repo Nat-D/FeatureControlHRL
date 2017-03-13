@@ -78,6 +78,7 @@ def run(args, server):
         global_step = sess.run(trainer.global_step)
         logger.info("Starting training at step=%d", global_step)
         while not sv.should_stop() and (not num_global_steps or global_step < num_global_steps):
+            tf.set_random_seed(args.task + global_step)
             trainer.process(sess)
             global_step = sess.run(trainer.global_step)
 

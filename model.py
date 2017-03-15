@@ -69,7 +69,8 @@ class LSTMPolicy(object):
 
         for i in range(4):
             x = conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2])
-            random_filter = tf.get_variable('rand{}'.format(i + 1), x.get_shape(), initializer=tf.constant_initializer(1.0), trainable=False)
+            random_filter = tf.get_variable('rand{}'.format(i + 1), [1, ] + x.get_shape()[1:],
+                                            initializer=tf.constant_initializer(1.0), trainable=False)
             self.dropout_collection.append(random_filter)
             x = custom_dropout(x,  0.7, random_filter, name = 'dropout{}'.format(i + 1))
             x = tf.nn.elu(x)

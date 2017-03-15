@@ -237,8 +237,10 @@ should be computed.
             # TODO: For drop-out model, we want to sample from the parameter server
             # which is dropping out some units
             self.sync = tf.group(
-                *[ v1.assign(v2)
-                 for v1, v2 in zip(pi.var_list, self.network.var_list)]
+                *(
+                    [ v1.assign(v2) for v1, v2 in zip(pi.var_list, self.network.var_list)]
+                    +
+                    [v1.assign(tf.random.random_uniform(tf.shape(v1))) for v1 in self.network.dropout_collection])
             )
 
 

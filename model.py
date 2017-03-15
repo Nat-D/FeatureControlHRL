@@ -33,7 +33,7 @@ def conv2d(x, num_filters, name, filter_size=(3, 3), stride=(1, 1), pad="SAME", 
                             collections=collections)
         b = tf.get_variable("b", [1, 1, 1, num_filters], initializer=tf.constant_initializer(0.0),
                             collections=collections)
-        return tf.nn.dropout(tf.nn.conv2d(x, w, stride_shape, pad) + b, keep_prob=0.7, name='dropout_%s' % name)
+        return tf.nn.conv2d(x, w, stride_shape, pad) + b
 
 def linear(x, size, name, initializer=None, bias_init=0):
     w = tf.get_variable(name + "/w", [x.get_shape()[1], size], initializer=initializer)
@@ -44,12 +44,35 @@ def categorical_sample(logits, d):
     value = tf.squeeze(tf.multinomial(logits - tf.reduce_max(logits, [1], keep_dims=True), 1), [1])
     return tf.one_hot(value, d)
 
+def custom_dropout(x, keep_prob, random_filter, name='dropout'):
+    with tf.variable_scope(name):
+        k = tf.convert_to_tensor(keep_prob,
+                                 dtype=x.dtype,
+                                 name="keep_prob")
+        noise_shape = tf.shape(x)
+        # uniform [keep_prob, 1.0 + keep_prob)
+        random_tensor = keep_prob
+        random_tensor += random_filter
+        #random_tensor += tf.random.random_uniform(noise_shape,
+        #                                          seed=seed,
+        #                                           dtype=x.dtype)
+        # 0. if [keep_prob, 1.0) and 1. if [1.0, 1.0 + keep_prob)
+        binary_tensor = tf.floor(random_tensor)
+        ret = tf.div(x, keep_prob) * binary_tensor
+        ret.set_shape(x.get_shape())
+        return ret
+
 class LSTMPolicy(object):
     def __init__(self, ob_space, ac_space):
         self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
+        self.dropout_collection = []
 
         for i in range(4):
-            x = tf.nn.elu(conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2]))
+            x = conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2])
+            random_filter = tf.get_variable('rand{}'.format(i + 1), x.get_shape(), initializer=tf.constant_initializer(1.0), trainable=False)
+            self.dropout_collection.append(random_filter)
+            x = custom_dropout(x,  0.7, random_filter, name = 'dropout{}'.format(i + 1))
+            x = tf.nn.elu(x)
         # introduce a "fake" batch dimension of 1 after flatten so that we can do LSTM over time dim
         x = tf.expand_dims(flatten(x), [0])
         

@@ -73,13 +73,15 @@ def run(args, server):
         "Starting session. If this hangs, we're mostly likely waiting to connect to the parameter server. " +
         "One common cause is that the parameter server DNS name isn't resolving yet, or is misspecified.")
     with sv.managed_session(server.target, config=config) as sess, sess.as_default():
+        # set random seed for each worker
+        # offset will be set for different experiment run
+        tf.set_random_seed(args.task + args.seed_offset)
         sess.run(init_all_op)
         sess.run(trainer.sync)
         trainer.start(sess, summary_writer)
         global_step = sess.run(trainer.global_step)
         logger.info("Starting training at step=%d", global_step)
         while not sv.should_stop() and (not num_global_steps or global_step < num_global_steps):
-            tf.set_random_seed(args.task + global_step)
             trainer.process(sess)
             global_step = sess.run(trainer.global_step)
 
@@ -128,6 +130,9 @@ Setting up Tensorflow for data parallel work
     # Add visualisation argument
     parser.add_argument('--visualise', action='store_true',
                         help="Visualise the gym environment by running env.render() between each timestep")
+
+    # Seed offset for different experiments
+    parser.add_argument('--seed_offset', default=0, type=int, help='Offset to the seed number')
 
     args = parser.parse_args()
     spec = cluster_spec(args.num_workers, 1)

@@ -103,19 +103,20 @@ should be computed.
             grads, _ = tf.clip_by_global_norm(grads, 40.0)
 
             # This is sync ops which copy weights from shared space to the local.
-            # TODO: seperate into 2 ops, so that dropout can be apply seperately.
             self.sync = tf.group(
                 *(
                     [ v1.assign(v2) for v1, v2 in zip(pi.var_list, self.network.var_list)]
-                    +
-                    [v1.assign(tf.random_uniform(tf.shape(v1))) for v1 in self.network.dropout_collection])
-            )
+                   # +
+                   # [v1.assign(tf.random_uniform(tf.shape(v1))) for v1 in self.network.dropout_collection])
+                 ))
+            # assign random filter to *local* filter variable
+            self.drop = tf.group(*([v.assign(tf.random_uniform(tf.shape(v))) for v in pi.dropout_collection]))
+             
 
 
 
             grads_and_vars = list(zip(grads, self.network.var_list))
             inc_step = self.global_step.assign_add(tf.shape(pi.x)[0])
-
             # each worker has a different set of adam optimizer parameters
             opt = tf.train.AdamOptimizer(1e-4)
             self.train_op = tf.group(opt.apply_gradients(grads_and_vars), inc_step)
@@ -144,7 +145,7 @@ should be computed.
         (global step is the number of frames)
         """
         sess.run(self.sync)  # copy weights from shared to local
-
+	sess.run(self.drop)
 
         # Environment run for 20 steps or less
         terminal_end = False

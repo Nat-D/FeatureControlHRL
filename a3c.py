@@ -34,57 +34,6 @@ given a rollout, compute its returns and the advantage
 Batch = namedtuple("Batch", ["si", "a", "adv", "r", "terminal", "features"])
 
 
-
-def env_runner(env, policy, num_local_steps, summary_writer, render):
-
-    last_state = env.reset()
-    last_features = policy.get_initial_features()
-    length = 0
-    rewards = 0
-
-    while True:
-        terminal_end = False
-        rollout = PartialRollout()
-
-        for _ in range(num_local_steps):
-            fetched = policy.act(last_state, *last_features)
-            action, value_, features = fetched[0], fetched[1], fetched[2:]
-            # argmax to convert from one-hot
-            state, reward, terminal, info = env.step(action.argmax())
-            if render:
-                env.render()
-
-            # collect the experience
-            rollout.add(last_state, action, reward, value_, terminal, last_features)
-            length += 1
-            rewards += reward
-
-            last_state = state
-            last_features = features
-
-            if info:
-                summary = tf.Summary()
-                for k, v in info.items():
-                    summary.value.add(tag=k, simple_value=float(v))
-                summary_writer.add_summary(summary, policy.global_step.eval())
-                summary_writer.flush()
-
-            timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
-            if terminal or length >= timestep_limit:
-                terminal_end = True
-                if length >= timestep_limit or not env.metadata.get('semantics.autoreset'):
-                    last_state = env.reset()
-                last_features = policy.get_initial_features()
-                print("Episode finished. Sum of rewards: %d. Length: %d" % (rewards, length))
-                length = 0
-                rewards = 0
-                break
-
-        if not terminal_end:
-            rollout.r = policy.value(last_state, *last_features)
-
-
-
 class A3C(object):
     def __init__(self, env, task, visualise):
         """
@@ -173,11 +122,17 @@ should be computed.
             self.summary_writer = None
             self.local_steps = 0
 
+            # Policy use for interaction and backprop
+            self.pi = pi
+
     def start(self, sess, summary_writer):
-        self.runner.start_runner(sess, summary_writer)
         self.summary_writer = summary_writer
 
-
+        # Initialise last_state and last_features
+        self.last_state = self.env.reset()
+        self.last_features = self.pi.get_initial_features()
+        self.length = 0
+        self.rewards = 0
 
     def process(self, sess):
         """
@@ -185,17 +140,71 @@ should be computed.
         The network get sync.
         The environment is run for 20 steps or until termination.
         The worker calculates gradients and then one update to the shared weight is made.
-        (one local step = one update = 20 env steps)
+        (one local step = one update  =< 20 env steps )
+        (global step is the number of frames)
         """
         sess.run(self.sync)  # copy weights from shared to local
 
 
-        # TODO: Environment run for 20 steps
+        # Environment run for 20 steps or less
+        terminal_end = False
+        num_local_steps = 20
+        env = self.env
+        policy = self.pi
+        rollout = {
+            states  = [],
+            actions = [],
+            rewards = [],
+            values  = [],
+            r       = 0.0,
+            terminal= False,
+            features= []
+        }
+        for _ in range(num_local_steps):
+            # Take a step
+            fetched = policy.act(self.last_state, *self.last_features)
+            action, value_, features = fetched[0], fetched[1], fetched[2:]
+            # argmax to convert from one-hot
+            state, reward, terminal, info = env.step(action.argmax())
+            if render:
+                env.render()
 
-        #rollout = self.pull_batch_from_queue()
-        #batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
+            # collect the experience
+            rollout.states += [state]
+            rollout.actions += [action]
+            rollout.rewards += [reward]
+            rollout.values += [value]
+            rollout.terminal += terminal
+            rollout.features += [features]
 
+            self.length += 1
+            self.rewards += reward
 
+            self.last_state = state
+            self.last_features = features
+
+            if info:
+                summary = tf.Summary()
+                for k, v in info.items():
+                    summary.value.add(tag=k, simple_value=float(v))
+                summary_writer.add_summary(summary, policy.global_step.eval())
+                summary_writer.flush()
+
+            timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
+            if terminal or length >= timestep_limit:
+                terminal_end = True
+                if length >= timestep_limit or not env.metadata.get('semantics.autoreset'):
+                    self.last_state = env.reset()
+                self.last_features = policy.get_initial_features()
+                print("Episode finished. Sum of rewards: %d. Length: %d" % (rewards, length))
+                self.length = 0
+                self.rewards = 0
+                break
+
+        if not terminal_end:
+            rollout.r = policy.value(last_state, *last_features)
+
+        batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
 
         # Gradient Calculation
         should_compute_summary = self.task == 0 and self.local_steps % 11 == 0

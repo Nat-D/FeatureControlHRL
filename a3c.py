@@ -15,21 +15,22 @@ def discount(x, gamma):
 def process_rollout(rollout, gamma, lambda_=1.0):
     """
 given a rollout, compute its returns and the advantage
+rollout = [states, actions, rewards, values, r, terminal, features]
 """
-    batch_si = np.asarray(rollout.states)
-    batch_a = np.asarray(rollout.actions)
-    rewards = np.asarray(rollout.rewards)
-    vpred_t = np.asarray(rollout.values + [rollout.r])
+    batch_si = np.asarray(rollout[0])
+    batch_a = np.asarray(rollout[1])
+    rewards = np.asarray(rollout[2])
+    vpred_t = np.asarray(rollout[3] + [rollout[4]])
 
-    rewards_plus_v = np.asarray(rollout.rewards + [rollout.r])
+    rewards_plus_v = np.asarray(rollout[2] + [rollout[4]])
     batch_r = discount(rewards_plus_v, gamma)[:-1]
     delta_t = rewards + gamma * vpred_t[1:] - vpred_t[:-1]
     # this formula for the advantage comes "Generalized Advantage Estimation":
     # https://arxiv.org/abs/1506.02438
     batch_adv = discount(delta_t, gamma * lambda_)
 
-    features = rollout.features[0]
-    return Batch(batch_si, batch_a, batch_adv, batch_r, rollout.terminal, features)
+    features = rollout[6][0]
+    return Batch(batch_si, batch_a, batch_adv, batch_r, rollout[5], features)
 
 Batch = namedtuple("Batch", ["si", "a", "adv", "r", "terminal", "features"])
 
@@ -77,8 +78,7 @@ should be computed.
             self.loss = pi_loss + 0.5 * vf_loss - entropy * 0.01
 
 
-            #self.runner = RunnerThread(env, pi, 20, visualise)
-
+            self.visualise = visualise
 
             grads = tf.gradients(self.loss, pi.var_list)
 
@@ -151,59 +151,59 @@ should be computed.
         num_local_steps = 20
         env = self.env
         policy = self.pi
-        rollout = {
-            states  = [],
-            actions = [],
-            rewards = [],
-            values  = [],
-            r       = 0.0,
-            terminal= False,
-            features= []
-        }
+
+        states  = []
+        actions = []
+        rewards = []
+        values  = []
+        r       = 0.0
+        terminal= False
+        features= []
+
         for _ in range(num_local_steps):
             # Take a step
             fetched = policy.act(self.last_state, *self.last_features)
-            action, value_, features = fetched[0], fetched[1], fetched[2:]
+            action, value_, features_ = fetched[0], fetched[1], fetched[2:]
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
-            if render:
+            if self.visualise:
                 env.render()
 
             # collect the experience
-            rollout.states += [state]
-            rollout.actions += [action]
-            rollout.rewards += [reward]
-            rollout.values += [value]
-            rollout.terminal += terminal
-            rollout.features += [features]
+            states += [self.last_state]
+            actions += [action]
+            rewards += [reward]
+            values += [value_]
+            features += [self.last_features]
 
             self.length += 1
             self.rewards += reward
 
             self.last_state = state
-            self.last_features = features
+            self.last_features = features_
 
             if info:
                 summary = tf.Summary()
                 for k, v in info.items():
                     summary.value.add(tag=k, simple_value=float(v))
-                summary_writer.add_summary(summary, policy.global_step.eval())
-                summary_writer.flush()
+                self.summary_writer.add_summary(summary, policy.global_step.eval())
+                self.summary_writer.flush()
 
             timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
-            if terminal or length >= timestep_limit:
+            if terminal or self.length >= timestep_limit:
                 terminal_end = True
-                if length >= timestep_limit or not env.metadata.get('semantics.autoreset'):
+                if self.length >= timestep_limit or not env.metadata.get('semantics.autoreset'):
                     self.last_state = env.reset()
                 self.last_features = policy.get_initial_features()
-                print("Episode finished. Sum of rewards: %d. Length: %d" % (rewards, length))
+                print("Episode finished. Sum of rewards: %d. Length: %d" % (self.rewards, self.length))
                 self.length = 0
                 self.rewards = 0
                 break
 
         if not terminal_end:
-            rollout.r = policy.value(last_state, *last_features)
+            r = policy.value(self.last_state, *self.last_features)
 
+        rollout = [states, actions, rewards, values, r, terminal, features]
         batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
 
         # Gradient Calculation

@@ -66,13 +66,13 @@ class LSTMPolicy(object):
     def __init__(self, ob_space, ac_space):
         self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
         self.dropout_collection = []
-
+        self.keep_prob = tf.placeholder(tf.float32)
         for i in range(4):
             x = conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2])
             random_filter = tf.get_variable('rand{}'.format(i + 1), [1, ] + x.get_shape().as_list()[1:],
                                             initializer=tf.constant_initializer(1.0), trainable=False)
             self.dropout_collection.append(random_filter)
-            x = custom_dropout(x,  0.7, random_filter, name = 'dropout{}'.format(i + 1))
+            x = custom_dropout(x,  self.keep_prob, random_filter, name = 'dropout{}'.format(i + 1))
             x = tf.nn.elu(x)
         # introduce a "fake" batch dimension of 1 after flatten so that we can do LSTM over time dim
         x = tf.expand_dims(flatten(x), [0])
@@ -110,11 +110,11 @@ class LSTMPolicy(object):
     def get_initial_features(self):
         return self.state_init
 
-    def act(self, ob, c, h):
+    def act(self, ob, c, h, keep_prob):
         sess = tf.get_default_session()
         return sess.run([self.sample, self.vf] + self.state_out,
-                        {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h})
+                        {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h, self.keep_prob: keep_prob})
 
-    def value(self, ob, c, h):
+    def value(self, ob, c, h, keep_prob):
         sess = tf.get_default_session()
-        return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h})[0]
+        return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h, self.keep_prob: keep_prob})[0]

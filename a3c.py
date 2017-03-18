@@ -48,7 +48,7 @@ should be computed.
         self.task = task
         worker_device = "/job:worker/task:{}/cpu:0".format(task)
         if test:
-           worker_device = "/job:eval/task:{}/cpu:0".format(task) 
+           worker_device = "/job:eval/task:{}/cpu:0".format(task)
         with tf.device(tf.train.replica_device_setter(1, worker_device=worker_device)):
             with tf.variable_scope("global"):
                 self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
@@ -111,8 +111,6 @@ should be computed.
                  ))
             # assign random filter to *local* filter variable
             self.drop = tf.group(*([v.assign(tf.random_uniform(tf.shape(v))) for v in pi.dropout_collection]))
-             
-
 
 
             grads_and_vars = list(zip(grads, self.network.var_list))
@@ -123,15 +121,14 @@ should be computed.
             self.summary_writer = None
             self.local_steps = 0
 
-            # Policy use for interaction and backprop
-            self.pi = pi
+
 
     def start(self, sess, summary_writer):
         self.summary_writer = summary_writer
 
         # Initialise last_state and last_features
         self.last_state = self.env.reset()
-        self.last_features = self.pi.get_initial_features()
+        self.last_features = self.local_network.get_initial_features()
         self.length = 0
         self.rewards = 0
 
@@ -145,13 +142,13 @@ should be computed.
         (global step is the number of frames)
         """
         sess.run(self.sync)  # copy weights from shared to local
-	sess.run(self.drop)
+        sess.run(self.drop)
 
         # Environment run for 20 steps or less
         terminal_end = False
         num_local_steps = 20
         env = self.env
-        policy = self.pi
+        policy = self.local_network
 
         states  = []
         actions = []
@@ -163,7 +160,7 @@ should be computed.
 
         for _ in range(num_local_steps):
             # Take a step
-            fetched = policy.act(self.last_state, *self.last_features)
+            fetched = policy.act(self.last_state, *self.last_features, keep_prob=0.7)
             action, value_, features_ = fetched[0], fetched[1], fetched[2:]
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
@@ -202,7 +199,7 @@ should be computed.
                 break
 
         if not terminal_end:
-            r = policy.value(self.last_state, *self.last_features)
+            r = policy.value(self.last_state, *self.last_features, keep_prob=0.7)
 
         rollout = [states, actions, rewards, values, r, terminal, features]
         batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
@@ -222,6 +219,7 @@ should be computed.
             self.r: batch.r,
             self.local_network.state_in[0]: batch.features[0],
             self.local_network.state_in[1]: batch.features[1],
+            self.local_network.keep_prob: [0.7]
         }
 
         fetched = sess.run(fetches, feed_dict=feed_dict)
@@ -232,4 +230,36 @@ should be computed.
         self.local_steps += 1
 
     def evaluate(self,sess):
-        print('eval')
+        global_step = sess.run(self.global_step)
+        sess.run(self.sync)
+        policy = self.local_network
+        env = self.env
+        rewards_stat = []
+        length_stat = []
+        # average over 40 episode?
+        for episode in range(40):
+            terminal = False
+            last_state = env.reset()
+            last_features = policy.get_initial_features()
+            rewards = 0
+            length = 0
+            while not terminal:
+                fetched = policy.act(last_state, *last_features, keep_prob=1.0)
+                action, value_, features_ = fetched[0], fetched[1], fetched[2:]
+                state, reward, terminal, info = env.step(action.argmax())
+                if self.visualise:
+                    env.render()
+                length += 1
+                rewards += reward
+                last_state = state
+                last_features = features_
+
+            rewards_stat.append(rewards)
+            length_stat.append(length)
+
+        summary = tf.Summary()
+        summary.value.add(tag='Average Reward', simple_value=np.mean(rewards_stat))
+        summary.value.add(tag='S.D. of Reward', simple_value=np.std(rewards_stat))
+        summary.value.add(tag='Average Lenght', simple_value=np.mean(length_stat))
+        self.summary_writer.add_summary(summary, global_step)
+        self.summary_writer.flush()

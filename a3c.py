@@ -36,7 +36,7 @@ Batch = namedtuple("Batch", ["si", "a", "adv", "r", "terminal", "features"])
 
 
 class A3C(object):
-    def __init__(self, env, task, visualise):
+    def __init__(self, env, task, visualise, test=False):
         """
 An implementation of the A3C algorithm that is reasonably well-tuned for the VNC environments.
 Below, we will have a modest amount of complexity due to the way TensorFlow handles data parallelism.
@@ -47,6 +47,8 @@ should be computed.
         self.env = env
         self.task = task
         worker_device = "/job:worker/task:{}/cpu:0".format(task)
+        if test:
+           worker_device = "/job:eval/task:{}/cpu:0".format(task) 
         with tf.device(tf.train.replica_device_setter(1, worker_device=worker_device)):
             with tf.variable_scope("global"):
                 self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
@@ -106,8 +108,6 @@ should be computed.
             self.sync = tf.group(
                 *(
                     [ v1.assign(v2) for v1, v2 in zip(pi.var_list, self.network.var_list)]
-                   # +
-                   # [v1.assign(tf.random_uniform(tf.shape(v1))) for v1 in self.network.dropout_collection])
                  ))
             # assign random filter to *local* filter variable
             self.drop = tf.group(*([v.assign(tf.random_uniform(tf.shape(v))) for v in pi.dropout_collection]))
@@ -230,3 +230,6 @@ should be computed.
             self.summary_writer.add_summary(tf.Summary.FromString(fetched[0]), fetched[-1])
             self.summary_writer.flush()
         self.local_steps += 1
+
+    def evaluate(self,sess):
+        print('eval')

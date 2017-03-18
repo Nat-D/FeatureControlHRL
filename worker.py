@@ -11,7 +11,7 @@ from a3c import A3C
 from envs import create_env
 import distutils.version
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
-
+from time import sleep
 logger = logging.getLogger(__name__)
 logger.setLevel(logging.INFO)
 
@@ -78,6 +78,7 @@ def run(args, server):
         tf.set_random_seed(args.task + args.seed_offset)
         
         sess.run(trainer.sync)
+        sess.run(trainer.drop)
         trainer.start(sess, summary_writer)
         global_step = sess.run(trainer.global_step)
         logger.info("Starting training at step=%d", global_step)
@@ -89,7 +90,38 @@ def run(args, server):
     sv.stop()
     logger.info('reached %s steps. worker stopped.', global_step)
 
-def cluster_spec(num_workers, num_ps):
+def run_eval(args, server):
+    env = create_env(args.env_id, client_id="eval", remotes=args.remotes)
+    tester = A3C(env, args.task, args.visualise, test=True)
+
+    config = tf.ConfigProto(device_filters=["/job:ps","/job:eval/task:{}/cpu:0".format(args.task)])
+    logdir = os.path.join(args.log_dir, 'eval')
+    summary_writer = tf.summary.FileWriter(logdir)
+    num_global_steps = 100000000    
+    with tf.Session(server.target, config=config) as sess, sess.as_default():
+        tf.set_random_seed(args.num_workers + args.seed_offset + 1)
+        # this need to wait for ps to intialise varaible first.
+        error = True
+        while error:
+            try:
+                sess.run(tester.sync)
+                sess.run(tester.drop)
+                error = False
+            except:
+                pass
+        tester.start(sess, summary_writer)
+        global_step = sess.run(tester.global_step)
+        eval_step = 0
+        while global_step < num_global_steps :
+            global_step = sess.run(tester.global_step)
+            if global_step > eval_step * 2e5:
+                logger.info("Starting Evaluation at step=%d", global_step)    
+                tester.evaluate(sess)
+                 
+
+
+
+def cluster_spec(num_workers, num_ps, num_eval):
     """
 More tensorflow setup for data parallelism
 """
@@ -108,6 +140,12 @@ More tensorflow setup for data parallelism
         all_workers.append('{}:{}'.format(host, port))
         port += 1
     cluster['worker'] = all_workers
+
+    all_eval = []
+    for _ in range(num_eval):
+        all_eval.append('{}:{}'.format(host, port))
+        port += 1
+    cluster['eval'] = all_eval
     return cluster
 
 def main(_):
@@ -135,7 +173,7 @@ Setting up Tensorflow for data parallel work
     parser.add_argument('--seed_offset', default=0, type=int, help='Offset to the seed number')
 
     args = parser.parse_args()
-    spec = cluster_spec(args.num_workers, 1)
+    spec = cluster_spec(args.num_workers, 1, 1)
     cluster = tf.train.ClusterSpec(spec).as_cluster_def()
 
     def shutdown(signal, frame):
@@ -147,8 +185,12 @@ Setting up Tensorflow for data parallel work
 
     if args.job_name == "worker":
         server = tf.train.Server(cluster, job_name="worker", task_index=args.task,
-                                 config=tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=2))
+                                 config=tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1))
         run(args, server)
+    elif args.job_name == "eval":
+        server = tf.train.Server(cluster, job_name="eval", task_index=args.task,
+                                 config=tf.ConfigProto(intra_op_parallelism_threads=1, inter_op_parallelism_threads=1))
+        run_eval(args, server)
     else:
         server = tf.train.Server(cluster, job_name="ps", task_index=args.task,
                                  config=tf.ConfigProto(device_filters=["/job:ps"]))

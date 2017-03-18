@@ -44,35 +44,16 @@ def categorical_sample(logits, d):
     value = tf.squeeze(tf.multinomial(logits - tf.reduce_max(logits, [1], keep_dims=True), 1), [1])
     return tf.one_hot(value, d)
 
-def custom_dropout(x, keep_prob, random_filter, name='dropout'):
-    with tf.variable_scope(name):
-        k = tf.convert_to_tensor(keep_prob,
-                                 dtype=x.dtype,
-                                 name="keep_prob")
-        noise_shape = tf.shape(x)
-        # uniform [keep_prob, 1.0 + keep_prob)
-        random_tensor = keep_prob
-        random_tensor += random_filter
-        #random_tensor += tf.random.random_uniform(noise_shape,
-        #                                          seed=seed,
-        #                                           dtype=x.dtype)
-        # 0. if [keep_prob, 1.0) and 1. if [1.0, 1.0 + keep_prob)
-        binary_tensor = tf.floor(random_tensor)
-        ret = tf.div(x, keep_prob) * binary_tensor
-        ret.set_shape(x.get_shape())
-        return ret
 
 class LSTMPolicy(object):
     def __init__(self, ob_space, ac_space):
         self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
-        self.dropout_collection = []
-        self.keep_prob = tf.placeholder(tf.float32)
+
         for i in range(4):
             x = conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2])
             random_filter = tf.get_variable('rand{}'.format(i + 1), [1, ] + x.get_shape().as_list()[1:],
                                             initializer=tf.constant_initializer(1.0), trainable=False)
-            self.dropout_collection.append(random_filter)
-            x = custom_dropout(x,  self.keep_prob, random_filter, name = 'dropout{}'.format(i + 1))
+
             x = tf.nn.elu(x)
         # introduce a "fake" batch dimension of 1 after flatten so that we can do LSTM over time dim
         x = tf.expand_dims(flatten(x), [0])
@@ -113,8 +94,8 @@ class LSTMPolicy(object):
     def act(self, ob, c, h, keep_prob):
         sess = tf.get_default_session()
         return sess.run([self.sample, self.vf] + self.state_out,
-                        {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h, self.keep_prob: keep_prob})
+                        {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h})
 
     def value(self, ob, c, h, keep_prob):
         sess = tf.get_default_session()
-        return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h, self.keep_prob: keep_prob})[0]
+        return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h})[0]

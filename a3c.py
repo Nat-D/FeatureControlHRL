@@ -109,8 +109,6 @@ should be computed.
                 *(
                     [ v1.assign(v2) for v1, v2 in zip(pi.var_list, self.network.var_list)]
                  ))
-            # assign random filter to *local* filter variable
-            self.drop = tf.group(*([v.assign(tf.random_uniform(tf.shape(v))) for v in pi.dropout_collection]))
 
 
             grads_and_vars = list(zip(grads, self.network.var_list))
@@ -142,7 +140,6 @@ should be computed.
         (global step is the number of frames)
         """
         sess.run(self.sync)  # copy weights from shared to local
-        sess.run(self.drop)
 
         # Environment run for 20 steps or less
         terminal_end = False
@@ -160,7 +157,7 @@ should be computed.
 
         for _ in range(num_local_steps):
             # Take a step
-            fetched = policy.act(self.last_state, *self.last_features, keep_prob=0.7)
+            fetched = policy.act(self.last_state, *self.last_features)
             action, value_, features_ = fetched[0], fetched[1], fetched[2:]
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
@@ -199,7 +196,7 @@ should be computed.
                 break
 
         if not terminal_end:
-            r = policy.value(self.last_state, *self.last_features, keep_prob=0.7)
+            r = policy.value(self.last_state, *self.last_features)
 
         rollout = [states, actions, rewards, values, r, terminal, features]
         batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
@@ -218,8 +215,7 @@ should be computed.
             self.adv: batch.adv,
             self.r: batch.r,
             self.local_network.state_in[0]: batch.features[0],
-            self.local_network.state_in[1]: batch.features[1],
-            self.local_network.keep_prob: [0.7]
+            self.local_network.state_in[1]: batch.features[1]
         }
 
         fetched = sess.run(fetches, feed_dict=feed_dict)
@@ -244,7 +240,7 @@ should be computed.
             rewards = 0
             length = 0
             while not terminal:
-                fetched = policy.act(last_state, *last_features, keep_prob=1.0)
+                fetched = policy.act(last_state, *last_features)
                 action, value_, features_ = fetched[0], fetched[1], fetched[2:]
                 state, reward, terminal, info = env.step(action.argmax())
                 if self.visualise:

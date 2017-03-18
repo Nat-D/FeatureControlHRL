@@ -233,7 +233,7 @@ should be computed.
         rewards_stat = []
         length_stat = []
         # average over 40 episode?
-        for episode in range(10):
+        for episode in range(40):
             terminal = False
             last_state = env.reset()
             last_features = policy.get_initial_features()

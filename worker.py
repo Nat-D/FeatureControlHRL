@@ -83,13 +83,16 @@ def run(args, server):
         sess.run(trainer.drop)
         trainer.start(sess, summary_writer)
         global_step = sess.run(trainer.global_step)
-        logger.info("Starting training at step=%d", global_step)
+        if args.eval:
+            logger.info("Starting Evaluate-worker")
+        else:
+            logger.info("Starting training at step=%d", global_step)
         eval_step = 1
         while not sv.should_stop() and (not num_global_steps or global_step < num_global_steps):
             if args.eval:
                 global_step = sess.run(trainer.global_step)
-                # every one million step?
-                if global_step > eval_step * 2e5:
+                # every one million step for longer environment
+                if global_step > eval_step * 10000: #2e4:
                     logger.info(" !!!! Starting Evaluation at step=%d", global_step)
                     trainer.evaluate(sess)
                     eval_step += 1

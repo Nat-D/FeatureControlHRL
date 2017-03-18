@@ -237,7 +237,7 @@ should be computed.
         rewards_stat = []
         length_stat = []
         # average over 40 episode?
-        for episode in range(40):
+        for episode in range(10):
             terminal = False
             last_state = env.reset()
             last_features = policy.get_initial_features()
@@ -258,8 +258,8 @@ should be computed.
             length_stat.append(length)
 
         summary = tf.Summary()
-        summary.value.add(tag='Average Reward', simple_value=np.mean(rewards_stat))
-        summary.value.add(tag='S.D. of Reward', simple_value=np.std(rewards_stat))
-        summary.value.add(tag='Average Lenght', simple_value=np.mean(length_stat))
+        summary.value.add(tag='Eval/Average_Reward', simple_value=np.mean(rewards_stat))
+        summary.value.add(tag='Eval/SD_Reward', simple_value=np.std(rewards_stat))
+        summary.value.add(tag='Eval/Average_Lenght', simple_value=np.mean(length_stat))
         self.summary_writer.add_summary(summary, global_step)
         self.summary_writer.flush()

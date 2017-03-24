@@ -69,7 +69,7 @@ def run(args, server):
                              save_model_secs=30,
                              save_summaries_secs=30)
 
-    num_global_steps = 2000000#100000000
+    num_global_steps = 100000000
 
     logger.info(
         "Starting session. If this hangs, we're mostly likely waiting to connect to the parameter server. " +

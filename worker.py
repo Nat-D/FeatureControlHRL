@@ -69,7 +69,7 @@ def run(args, server):
                              save_model_secs=30,
                              save_summaries_secs=30)
 
-    num_global_steps = 100000000
+    num_global_steps = 2000000#100000000
 
     logger.info(
         "Starting session. If this hangs, we're mostly likely waiting to connect to the parameter server. " +
@@ -80,7 +80,6 @@ def run(args, server):
         tf.set_random_seed(args.task + args.seed_offset)
 
         sess.run(trainer.sync)
-        sess.run(trainer.drop)
         trainer.start(sess, summary_writer)
         global_step = sess.run(trainer.global_step)
         if args.eval:
@@ -112,7 +111,7 @@ def cluster_spec(num_workers, num_ps):
 More tensorflow setup for data parallelism
 """
     cluster = {}
-    port = 12222
+    port = 40000#12222
 
     all_ps = []
     host = '127.0.0.1'

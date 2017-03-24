@@ -96,6 +96,7 @@ def run(args, server):
                     logger.info(" !!!! Starting Evaluation at step=%d", global_step)
                     trainer.evaluate(sess)
                     eval_step += 1
+                sleep(10)
             else:
                 trainer.process(sess)
                 global_step = sess.run(trainer.global_step)

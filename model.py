@@ -49,12 +49,15 @@ class LSTMPolicy(object):
     def __init__(self, ob_space, ac_space):
         self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
 
-        for i in range(4):
-            x = conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2])
-            random_filter = tf.get_variable('rand{}'.format(i + 1), [1, ] + x.get_shape().as_list()[1:],
-                                            initializer=tf.constant_initializer(1.0), trainable=False)
+        #for i in range(4):
+        #    x = conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2])
+        #    x = tf.nn.elu(x)
+        x = tf.nn.relu( conv2d(x, 32, "l1", [8, 8], [4, 4]) )
+        x = tf.nn.relu( conv2d(x, 64, "l2", [4, 4], [2, 2]) )
+        x = tf.nn.relu( conv2d(x, 64, "l3", [3, 3], [1, 1]) )
+        x = linear(flatten(x), 512, "hidden",  normalized_columns_initializer(1.0))
 
-            x = tf.nn.elu(x)
+
         # introduce a "fake" batch dimension of 1 after flatten so that we can do LSTM over time dim
         x = tf.expand_dims(flatten(x), [0])
 

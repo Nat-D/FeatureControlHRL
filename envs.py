@@ -164,8 +164,9 @@ class DiagnosticsInfoI(vectorized.Filter):
             self._all_rewards = []
 
         return observation, reward, done, to_log
-
+"""
 def _process_frame42(frame):
+    print(np.shape(frame))
     frame = frame[34:34+160, :160]
     # Resize by half, then down to 42x42 (essentially mipmapping). If
     # we resize directly we lose pixels that, when mapped to 42x42,
@@ -177,11 +178,21 @@ def _process_frame42(frame):
     frame *= (1.0 / 255.0)
     frame = np.reshape(frame, [42, 42, 1])
     return frame
+"""
+
+def _process_frame42(frame):
+    frame = cv2.resize(frame, (84, 84))
+    frame = frame.astype(np.float32)
+    frame *= (1.0/ 255.0)
+    frame = np.reshape(frame, [84, 84, 3])
+    return frame
+
 
 class AtariRescale42x42(vectorized.ObservationWrapper):
     def __init__(self, env=None):
         super(AtariRescale42x42, self).__init__(env)
-        self.observation_space = Box(0.0, 1.0, [42, 42, 1])
+        #self.observation_space = Box(0.0, 1.0, [42, 42, 1])
+        self.observation_space = Box(0.0, 1.0, [84, 84, 3])
 
     def _observation(self, observation_n):
         return [_process_frame42(observation) for observation in observation_n]

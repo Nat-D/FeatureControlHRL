@@ -182,10 +182,14 @@ should be computed.
                                  self.last_meta_features[1], self.last_meta_action,
                                  self.last_meta_reward)
             action, value_, features_ = fetched[0], fetched[1], fetched[2:]
-
-            # run actors
-            state, reward, terminal, info = self.actor_process(sess, action)
-
+            
+            reward = 0
+            # run actors several times
+            for _ in range(5): 
+                state, reward_, terminal, info = self.actor_process(sess, action)
+                reward += reward_
+                if terminal:
+                    break
             # collect experience
             states += [self.last_meta_state]
             actions += [action]
@@ -259,7 +263,7 @@ should be computed.
 
         # Environment run for 20 steps or less
         terminal_end = False
-        num_local_steps = 100
+        num_local_steps = 20
         env = self.env
         policy = self.local_network
 

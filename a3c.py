@@ -149,7 +149,7 @@ should be computed.
         # Initialise Meta controller
         self.last_meta_state = self.env.reset()
         self.last_meta_features = self.local_meta_network.get_initial_features()
-        self.last_meta_action = np.zeros(2)
+        self.last_meta_action = np.zeros(36)
         self.last_meta_reward = [0]
 
     def process(self, sess):

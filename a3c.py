@@ -12,29 +12,6 @@ use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.L
 def discount(x, gamma):
     return scipy.signal.lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
 
-def process_rollout(rollout, gamma, lambda_=1.0):
-    """
-given a rollout, compute its returns and the advantage
-rollout = [states, actions, rewards, values, r, terminal, features]
-"""
-    batch_si = np.asarray(rollout[0])
-    batch_a = np.asarray(rollout[1])
-    rewards = np.asarray(rollout[2])
-    vpred_t = np.asarray(rollout[3] + [rollout[4]])
-
-    rewards_plus_v = np.asarray(rollout[2] + [rollout[4]])
-    batch_r = discount(rewards_plus_v, gamma)[:-1]
-    delta_t = rewards + gamma * vpred_t[1:] - vpred_t[:-1]
-    # this formula for the advantage comes "Generalized Advantage Estimation":
-    # https://arxiv.org/abs/1506.02438
-    batch_adv = discount(delta_t, gamma * lambda_)
-
-    features = rollout[6][0]
-    return Batch(batch_si, batch_a, batch_adv, batch_r, rollout[5], features)
-
-Batch = namedtuple("Batch", ["si", "a", "adv", "r", "terminal", "features"])
-
-
 class A3C(object):
     def __init__(self, env, task, visualise, test=False):
         """
@@ -127,6 +104,8 @@ should be computed.
         # Initialise last_state and last_features
         self.last_state = self.env.reset()
         self.last_features = self.local_network.get_initial_features()
+        self.last_action = np.zeros(self.env.action_space.n)
+        self.last_reward = [0]
         self.length = 0
         self.rewards = 0
 
@@ -154,10 +133,13 @@ should be computed.
         r       = 0.0
         terminal= False
         features= []
+        prev_actions = []
+        prev_rewards = []
+        # TODO: add intrinsic reward see if it works
 
         for _ in range(num_local_steps):
             # Take a step
-            fetched = policy.act(self.last_state, *self.last_features)
+            fetched = policy.act(self.last_state, self.last_features[0], self.last_features[1], self.last_action, self.last_reward)
             action, value_, features_ = fetched[0], fetched[1], fetched[2:]
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
@@ -170,12 +152,16 @@ should be computed.
             rewards += [reward]
             values += [value_]
             features += [self.last_features]
+            prev_actions += [self.last_action]
+            prev_rewards += [self.last_reward]
 
             self.length += 1
             self.rewards += reward
 
             self.last_state = state
             self.last_features = features_
+            self.last_action = action
+            self.last_reward = [reward]
 
             if info:
                 summary = tf.Summary()
@@ -196,26 +182,42 @@ should be computed.
                 break
 
         if not terminal_end:
-            r = policy.value(self.last_state, *self.last_features)
+            r = policy.value(self.last_state, self.last_features[0], self.last_features[1], self.last_action, self.last_reward)
 
-        rollout = [states, actions, rewards, values, r, terminal, features]
-        batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
+        # Process rollout
+        gamma = 0.99
+        lambda_ = 1.0
+        batch_si = np.asarray(states)
+        batch_a = np.asarray(actions)
+        rewards_plus_v = np.asarray(rewards + [r])
+        rewards = np.asarray(rewards)
+        vpred_t = np.asarray(values + [r])
+        batch_r = discount(rewards_plus_v, gamma)[:-1]
+        delta_t = rewards + gamma * vpred_t[1:] - vpred_t[:-1]
+        # this formula for the advantage comes "Generalized Advantage Estimation":
+        # https://arxiv.org/abs/1506.02438
+        batch_adv = discount(delta_t, gamma * lambda_)
+        batch_prev_a = np.asarray(prev_actions)
+        batch_prev_r = np.asarray(prev_rewards)
 
         # Gradient Calculation
         should_compute_summary = self.task == 0 and self.local_steps % 11 == 0
-
         if should_compute_summary:
             fetches = [self.summary_op, self.train_op, self.global_step]
         else:
             fetches = [self.train_op, self.global_step]
 
+        features = features[0] # only use first feature into dynamic rnn
+
         feed_dict = {
-            self.local_network.x: batch.si,
-            self.ac: batch.a,
-            self.adv: batch.adv,
-            self.r: batch.r,
-            self.local_network.state_in[0]: batch.features[0],
-            self.local_network.state_in[1]: batch.features[1]
+            self.local_network.x: batch_si,
+            self.ac: batch_a,
+            self.adv: batch_adv,
+            self.r: batch_r,
+            self.local_network.state_in[0]: features[0],
+            self.local_network.state_in[1]: features[1],
+            self.local_network.prev_action: batch_prev_a,
+            self.local_network.prev_reward: batch_prev_r
         }
 
         fetched = sess.run(fetches, feed_dict=feed_dict)

@@ -49,17 +49,21 @@ class LSTMPolicy(object):
     def __init__(self, ob_space, ac_space):
         self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
 
-        #for i in range(4):
-        #    x = conv2d(x, 32, "l{}".format(i + 1), [3, 3], [2, 2])
-        #    x = tf.nn.elu(x)
-        x = tf.nn.relu( conv2d(x, 32, "l1", [8, 8], [4, 4]) )
-        x = tf.nn.relu( conv2d(x, 64, "l2", [4, 4], [2, 2]) )
-        x = tf.nn.relu( conv2d(x, 64, "l3", [3, 3], [1, 1]) )
-        x = linear(flatten(x), 512, "hidden",  normalized_columns_initializer(1.0))
+        x = tf.nn.relu( conv2d(x, 16, "l1", [8, 8], [4, 4]) )
+        x = tf.nn.relu( conv2d(x, 32, "l2", [4, 4], [2, 2]) )
+        x = tf.nn.relu(linear(flatten(x), 256, "hidden",  normalized_columns_initializer(1.0)))
 
+        self.prev_action = prev_action = tf.placeholder(tf.float32, [None, ac_space], "prev_a")
+        self.prev_reward = prev_reward = tf.placeholder(tf.float32, [None, 1], "prev_r")
+
+        # concat previous action and reward
+        x = tf.concat([x, prev_action], axis=1)
+        x = tf.concat([x, prev_reward], axis=1)
 
         # introduce a "fake" batch dimension of 1 after flatten so that we can do LSTM over time dim
-        x = tf.expand_dims(flatten(x), [0])
+        x = tf.expand_dims(x, [0])
+
+
 
         size = 256
         if use_tf100_api:
@@ -94,11 +98,11 @@ class LSTMPolicy(object):
     def get_initial_features(self):
         return self.state_init
 
-    def act(self, ob, c, h):
+    def act(self, ob, c, h, prev_a, prev_r):
         sess = tf.get_default_session()
         return sess.run([self.sample, self.vf] + self.state_out,
-                        {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h})
+                        {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h, self.prev_action: [prev_a], self.prev_reward: [prev_r] })
 
-    def value(self, ob, c, h):
+    def value(self, ob, c, h, prev_a, prev_r):
         sess = tf.get_default_session()
-        return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h})[0]
+        return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h, self.prev_action: [prev_a], self.prev_reward: [prev_r]})[0]

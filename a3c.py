@@ -8,6 +8,8 @@ import scipy.signal
 import threading
 import distutils.version
 use_tf12_api = distutils.version.LooseVersion(tf.VERSION) >= distutils.version.LooseVersion('0.12.0')
+import cv2
+
 
 def discount(x, gamma):
     return scipy.signal.lfilter([1], [1, -gamma], x[::-1], axis=0)[::-1]
@@ -98,6 +100,7 @@ should be computed.
 
 
 
+
     def start(self, sess, summary_writer):
         self.summary_writer = summary_writer
 
@@ -135,16 +138,31 @@ should be computed.
         features= []
         prev_actions = []
         prev_rewards = []
-        # TODO: add intrinsic reward see if it works
 
-        for _ in range(num_local_steps):
+        # TODO: add intrinsic reward see if it works
+        goal_patch = np.zeros([84,84,3])
+        goal_patch[45:55, 55:65, :] = 1
+
+        for _local_step in range(num_local_steps):
             # Take a step
             fetched = policy.act(self.last_state, self.last_features[0], self.last_features[1], self.last_action, self.last_reward)
             action, value_, features_ = fetched[0], fetched[1], fetched[2:]
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
+
+
+            # Intrinsic reward
+            pixel_changes = (state - self.last_state)**2
+            # mean square error normalized by all pixel_changes
+            intrinsic_reward = np.sum( pixel_changes * goal_patch ) / np.sum( pixel_changes + 1e-5)
+            # Apply intrinsic reward
+            reward += intrinsic_reward
+
             if self.visualise:
-                env.render()
+                vis = 0.5 * state + 0.5 * goal_patch
+                vis = cv2.resize(vis, (500,500))
+                cv2.imshow('img', vis)
+                cv2.waitKey(10)
 
             # collect the experience
             states += [self.last_state]
@@ -167,6 +185,10 @@ should be computed.
                 summary = tf.Summary()
                 for k, v in info.items():
                     summary.value.add(tag=k, simple_value=float(v))
+
+                if _local_step == 19:
+                    summary.value.add(tag='global/shaped_reward_per_time' , simple_value=np.mean(rewards) )
+
                 self.summary_writer.add_summary(summary, policy.global_step.eval())
                 self.summary_writer.flush()
 
@@ -177,6 +199,12 @@ should be computed.
                     self.last_state = env.reset()
                 self.last_features = policy.get_initial_features()
                 print("Episode finished. Sum of rewards: %d. Length: %d" % (self.rewards, self.length))
+
+                summary = tf.Summary()
+                summary.value.add(tag='global/episode_shaped_reward', simple_value=self.rewards)
+                self.summary_writer.add_summary(summary, policy.global_step.eval())
+                self.summary_writer.flush()
+
                 self.length = 0
                 self.rewards = 0
                 break

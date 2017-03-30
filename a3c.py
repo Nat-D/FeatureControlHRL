@@ -33,12 +33,12 @@ should be computed.
                 self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
                 self.global_step = tf.get_variable("global_step", [], tf.int32, initializer=tf.constant_initializer(0, dtype=tf.int32),
                                                    trainable=False)
-                self.meta_network = MetaPolicy(env.observation_space.shape, 2)
+                self.meta_network = MetaPolicy(env.observation_space.shape, 36)
 
         with tf.device(worker_device):
             with tf.variable_scope("local"):
                 self.local_network = pi = LSTMPolicy(env.observation_space.shape, env.action_space.n)
-                self.local_meta_network = meta_pi = MetaPolicy(env.observation_space.shape, 2)
+                self.local_meta_network = meta_pi = MetaPolicy(env.observation_space.shape, 36)
                 pi.global_step = self.global_step
 
             self.ac = tf.placeholder(tf.float32, [None, env.action_space.n], name="ac")
@@ -97,21 +97,18 @@ should be computed.
             ########## META CONTROLLER ########
             ###################################
 
-            self.meta_ac = tf.placeholder(tf.float32, [None, 2], name="meta_ac")
+            self.meta_ac = tf.placeholder(tf.float32, [None, 36], name="meta_ac")
             self.meta_adv = tf.placeholder(tf.float32, [None], name="meta_adv")
             self.meta_r = tf.placeholder(tf.float32, [None], name="meta_r")
 
-            # log likelihood
-            meta_log_prob_tf =  tf.reduce_sum(
-                                - 0.5 * tf.square( self.meta_ac - meta_pi.means ) / ( meta_pi.vars + 1e-5)  \
-                                - 0.5 * tf.log(meta_pi.vars + 1e-5) - 0.5 * tf.log( 2 *np.pi)
-                                , axis = 1)
+            meta_log_prob_tf = tf.nn.log_softmax(meta_pi.logits)
+            meta_prob_tf = tf.nn.softmax(meta_pi.logits)
 
-            meta_pi_loss =  - tf.reduce_sum( meta_log_prob_tf * self.meta_adv )
+            meta_pi_loss = - tf.reduce_sum(tf.reduce_sum(meta_log_prob_tf * self.meta_ac, [1]) * self.meta_adv)
             meta_vf_loss = 0.5 * tf.reduce_sum(tf.square(meta_pi.vf - self.meta_r))
 
-            # entropy of gaussian 0.5 * ln( 2 * var * pi * e )
-            meta_entropy = tf.reduce_sum( 0.5 * tf.log( 2 * meta_pi.vars * np.pi * np.e) )
+            # entropy
+            meta_entropy = - tf.reduce_sum(meta_prob_tf * meta_log_prob_tf)
             meta_bs = tf.to_float(tf.shape(meta_pi.x)[0])
 
             self.meta_loss = meta_pi_loss + 0.5 * meta_vf_loss - meta_entropy * 0.01
@@ -184,7 +181,7 @@ should be computed.
             fetched = policy.act(self.last_meta_state, self.last_meta_features[0],
                                  self.last_meta_features[1], self.last_meta_action,
                                  self.last_meta_reward)
-            action, value_, features_ = fetched[0][0], fetched[1], fetched[2:]
+            action, value_, features_ = fetched[0], fetched[1], fetched[2:]
 
             # run actors
             state, reward, terminal, info = self.actor_process(sess, action)
@@ -278,11 +275,20 @@ should be computed.
         extrinsic_rewards = []
 
         # move patch(13x13) around with meta_action
-        goal_patch = np.zeros([84+12,84+12,3]) # with padding
-        pos_x = int(np.floor(meta_action[0])) + 6 #
-        pos_y = int(np.floor(meta_action[1])) + 6 #
-        goal_patch[ pos_x - 6 : pos_x + 7 , pos_y - 6: pos_y + 7, :] = 1
-        goal_patch = goal_patch[6:6+84, 6:6+84, :] # remove padding
+        #goal_patch = np.zeros([84+12,84+12,3]) # with padding
+        #pos_x = int(np.floor(meta_action[0])) + 6 #
+        #pos_y = int(np.floor(meta_action[1])) + 6 #
+        #goal_patch[ pos_x - 6 : pos_x + 7 , pos_y - 6: pos_y + 7, :] = 1
+        #goal_patch = goal_patch[6:6+84, 6:6+84, :] # remove padding
+
+        # select patch 1 in 36. each patch is 14x14
+        # idx = 6*x + y where x:[0,5], y[0:5], idx:[0,35]
+        # x =  idx // 6
+        idx = meta_action.argmax()
+        pos_x = idx // 6
+        pos_y = idx - 6*pos_x
+        goal_patch = np.zeros([84, 84, 3])
+        goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
 
         for _local_step in range(num_local_steps):
             # Take a step

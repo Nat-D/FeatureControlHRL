@@ -62,12 +62,14 @@ class LSTMPolicy(object):
             x = tf.concat([x, prev_action], axis=1)
             x = tf.concat([x, prev_reward], axis=1)
 
-            self.meta_action = meta_action = tf.placeholder(tf.float32, [None, 2], "meta_action")
-            
-            # Use bilinear mapping
-            x1 = x * self.meta_action[:, 0]
-            x2 = x * self.meta_action[:, 1]
-            x = tf.concat([x1, x2], axis=1)
+            self.meta_action = meta_action = tf.placeholder(tf.float32, [None, 36], "meta_action")
+
+            # concat
+            x = tf.concat([x, meta_action], axis=1)
+            # bilinear
+            #x1 = x * tf.expand_dims(self.meta_action[:, 0], [1])
+            #x2 = x * tf.expand_dims(self.meta_action[:, 1], [1])
+            #x = tf.concat([x1, x2], axis=1)
 
             # introduce a "fake" batch dimension of 1 after flatten so that we can do LSTM over time dim
             x = tf.expand_dims(x, [0])
@@ -121,7 +123,7 @@ class LSTMPolicy(object):
 
 
 class MetaPolicy(object):
-    def __init__(self, ob_space, ac_space = 2):
+    def __init__(self, ob_space, ac_space = 36):
 
         with tf.variable_scope('conv', reuse=True):
             self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
@@ -168,12 +170,9 @@ class MetaPolicy(object):
             self.vf = tf.reshape(linear(x, 1, "value", normalized_columns_initializer(1.0)), [-1])
             self.state_out = [lstm_c[:1, :], lstm_h[:1, :]]
 
-            # output gaussian policy : limit the range to mean:[0,84] and var:[0, 10]
-            # Need to intialise to be roughly in the center of the screen with large variance
-            self.means =  84 * tf.sigmoid( linear(x, 2, "means", normalized_columns_initializer(0.1)) )
-            self.vars = 100 * tf.sigmoid( linear(x, 2, "vars", normalized_columns_initializer(1.0)) )
-            eps = tf.random_normal(tf.shape(self.vars), name="eps")
-            self.sample = self.means + tf.sqrt(self.vars) * eps
+            # try logits with 36 actions
+            self.logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))
+            self.sample = categorical_sample(self.logits, ac_space)[0, :]
 
         self.var_list = tf.get_collection(tf.GraphKeys.TRAINABLE_VARIABLES, tf.get_variable_scope().name)
 

@@ -62,6 +62,10 @@ class LSTMPolicy(object):
             x = tf.concat([x, prev_action], axis=1)
             x = tf.concat([x, prev_reward], axis=1)
 
+            self.meta_action = meta_action = tf.placeholder(tf.float32, [None, 2], "meta_action")
+            # concat meta action !!
+            x = tf.concat([x, meta_action], axis=1)
+
             # introduce a "fake" batch dimension of 1 after flatten so that we can do LSTM over time dim
             x = tf.expand_dims(x, [0])
 
@@ -99,14 +103,18 @@ class LSTMPolicy(object):
     def get_initial_features(self):
         return self.state_init
 
-    def act(self, ob, c, h, prev_a, prev_r):
+    def act(self, ob, c, h, prev_a, prev_r, meta_a):
         sess = tf.get_default_session()
         return sess.run([self.sample, self.vf] + self.state_out,
-                        {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h, self.prev_action: [prev_a], self.prev_reward: [prev_r] })
+                        {self.x: [ob], self.state_in[0]: c,
+                        self.state_in[1]: h, self.prev_action: [prev_a],
+                        self.prev_reward: [prev_r], self.meta_action: [meta_a] })
 
-    def value(self, ob, c, h, prev_a, prev_r):
+    def value(self, ob, c, h, prev_a, prev_r, meta_a):
         sess = tf.get_default_session()
-        return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c, self.state_in[1]: h, self.prev_action: [prev_a], self.prev_reward: [prev_r]})[0]
+        return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c,
+                        self.state_in[1]: h, self.prev_action: [prev_a],
+                        self.prev_reward: [prev_r], self.meta_action: [meta_a]})[0]
 
 
 class MetaPolicy(object):

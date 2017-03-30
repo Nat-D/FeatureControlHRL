@@ -286,7 +286,8 @@ should be computed.
 
         for _local_step in range(num_local_steps):
             # Take a step
-            fetched = policy.act(self.last_state, self.last_features[0], self.last_features[1], self.last_action, self.last_reward)
+            fetched = policy.act(self.last_state, self.last_features[0], self.last_features[1],
+                                 self.last_action, self.last_reward, meta_action)
             action, value_, features_ = fetched[0], fetched[1], fetched[2:]
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
@@ -316,6 +317,7 @@ should be computed.
             features += [self.last_features]
             prev_actions += [self.last_action]
             prev_rewards += [self.last_reward]
+
 
             self.length += 1
             self.rewards += reward
@@ -354,7 +356,9 @@ should be computed.
                 break
 
         if not terminal_end:
-            r = policy.value(self.last_state, self.last_features[0], self.last_features[1], self.last_action, self.last_reward)
+            r = policy.value(self.last_state, self.last_features[0],
+                             self.last_features[1], self.last_action,
+                             self.last_reward, meta_action)
 
         # Process rollout
         gamma = 0.99
@@ -374,6 +378,9 @@ should be computed.
         features = features[0] # only use first feature into dynamic rnn
 
 
+        # Batch meta action
+        batch_meta_ac = np.repeat([meta_action], len(batch_si), axis=0)
+
         # Gradient Calculation
         should_compute_summary = self.task == 0 and self.local_steps % 11 == 0
         if should_compute_summary:
@@ -391,7 +398,8 @@ should be computed.
             self.local_network.state_in[0]: features[0],
             self.local_network.state_in[1]: features[1],
             self.local_network.prev_action: batch_prev_a,
-            self.local_network.prev_reward: batch_prev_r
+            self.local_network.prev_reward: batch_prev_r,
+            self.local_network.meta_action: batch_meta_ac
         }
 
         fetched = sess.run(fetches, feed_dict=feed_dict)

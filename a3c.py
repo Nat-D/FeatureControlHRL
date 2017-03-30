@@ -338,8 +338,8 @@ should be computed.
                 for k, v in info.items():
                     summary.value.add(tag=k, simple_value=float(v))
 
-                if _local_step == 19:
-                    summary.value.add(tag='global/shaped_reward_per_time' , simple_value=np.mean(rewards) )
+                #if _local_step == (num_local_steps- 1):
+                #    summary.value.add(tag='global/shaped_reward_per_time' , simple_value=np.mean(rewards) )
 
                 self.summary_writer.add_summary(summary, policy.global_step.eval())
                 self.summary_writer.flush()
@@ -354,6 +354,7 @@ should be computed.
 
                 summary = tf.Summary()
                 summary.value.add(tag='global/episode_shaped_reward', simple_value=self.rewards)
+                summary.value.add(tag='global/shaped_reward_per_time', simple_value=self.rewards/self.length)
                 self.summary_writer.add_summary(summary, policy.global_step.eval())
                 self.summary_writer.flush()
 

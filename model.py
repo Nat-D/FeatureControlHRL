@@ -63,8 +63,11 @@ class LSTMPolicy(object):
             x = tf.concat([x, prev_reward], axis=1)
 
             self.meta_action = meta_action = tf.placeholder(tf.float32, [None, 2], "meta_action")
-            # concat meta action !!
-            x = tf.concat([x, meta_action], axis=1)
+            
+            # Use bilinear mapping
+            x1 = x * self.meta_action[:, 0]
+            x2 = x * self.meta_action[:, 1]
+            x = tf.concat([x1, x2], axis=1)
 
             # introduce a "fake" batch dimension of 1 after flatten so that we can do LSTM over time dim
             x = tf.expand_dims(x, [0])

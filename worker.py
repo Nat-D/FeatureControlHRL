@@ -79,7 +79,9 @@ def run(args, server):
         # offset will be set for different experiment run
         tf.set_random_seed(args.task + args.seed_offset)
 
+        sess.run(trainer.meta_sync)
         sess.run(trainer.sync)
+
         trainer.start(sess, summary_writer)
         global_step = sess.run(trainer.global_step)
         if args.eval:

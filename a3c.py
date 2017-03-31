@@ -430,7 +430,7 @@ should be computed.
         return self.last_state, np.sum(extrinsic_rewards), terminal_end, None
 
     def evaluate(self,sess):
-        
+
         # TODO: test this
         global_step = sess.run(self.global_step)
         sess.run(self.meta_sync)
@@ -455,6 +455,8 @@ should be computed.
             last_reward = [0]
             rewards = 0
             length = 0
+            goal_patch = np.zeros([84, 84, 3]) # for visualisation
+
 
             while not terminal:
 
@@ -463,6 +465,14 @@ should be computed.
                 meta_action, meta_value_, meta_features_ = fetched[0], fetched[1], fetched[2:]
 
                 meta_reward = 0
+
+                if self.visualise:
+                    idx = meta_action.argmax()
+                    pos_x = idx // 6
+                    pos_y = idx - 6*pos_x
+                    goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
+
+
                 for _ in range(5):
                     fetched = policy.act(last_state, last_features[0], last_features[1],
                                      last_action, last_reward, meta_action)
@@ -478,9 +488,9 @@ should be computed.
                     length += 1
                     rewards += reward
                     last_state = state
-                    last_features = features
+                    last_features = features_
                     last_action = action
-                    last_reward = reward_
+                    last_reward = [reward]
                     meta_reward += reward
 
                     timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')

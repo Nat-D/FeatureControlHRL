@@ -308,7 +308,7 @@ should be computed.
             # Intrinsic reward
             pixel_changes = (state - self.last_state)**2
             # mean square error normalized by all pixel_changes
-            intrinsic_reward = np.sum( pixel_changes * goal_patch ) / np.sum( pixel_changes + 1e-5)
+            intrinsic_reward = 0.05 * np.sum( pixel_changes * goal_patch ) / np.sum( pixel_changes + 1e-5)
 
             # record extrinsic reward
             extrinsic_rewards += [reward]

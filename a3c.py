@@ -467,13 +467,14 @@ should be computed.
                 meta_reward = 0
 
                 if self.visualise:
+                    goal_patch = 0.0 * goal_patch
                     idx = meta_action.argmax()
                     pos_x = idx // 6
                     pos_y = idx - 6*pos_x
                     goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
 
 
-                for _ in range(5):
+                for _ in range(20*5):
                     fetched = policy.act(last_state, last_features[0], last_features[1],
                                      last_action, last_reward, meta_action)
                     action, value_, features_ = fetched[0], fetched[1], fetched[2:]

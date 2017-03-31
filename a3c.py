@@ -304,6 +304,8 @@ should be computed.
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
 
+            # clip reward
+            reward = min(1, max(-1, reward))
 
             # Intrinsic reward
             pixel_changes = (state - self.last_state)**2

@@ -160,7 +160,6 @@ should be computed.
         The meta_network calculate gradient and update
         """
         sess.run(self.meta_sync)
-        sess.run(self.sync)
 
         terminal_end = False
         num_local_steps = 20
@@ -182,10 +181,11 @@ should be computed.
                                  self.last_meta_features[1], self.last_meta_action,
                                  self.last_meta_reward)
             action, value_, features_ = fetched[0], fetched[1], fetched[2:]
-            
+
             reward = 0
             # run actors several times
-            for _ in range(5): 
+            # TODO: tune this ... 2? maybe
+            for _ in range(5):
                 state, reward_, terminal, info = self.actor_process(sess, action)
                 reward += reward_
                 if terminal:
@@ -313,8 +313,10 @@ should be computed.
             # Apply intrinsic reward
             reward += intrinsic_reward
 
+            #TODO: clip the reward? rescale it?
+
             if self.visualise:
-                vis = 0.5 * state + 0.5 * goal_patch
+                vis = state - 0.5 * state * goal_patch + 0.5 * goal_patch
                 vis = cv2.resize(vis, (500,500))
                 cv2.imshow('img', vis)
                 cv2.waitKey(10)
@@ -342,8 +344,6 @@ should be computed.
                 for k, v in info.items():
                     summary.value.add(tag=k, simple_value=float(v))
 
-                #if _local_step == (num_local_steps- 1):
-                #    summary.value.add(tag='global/shaped_reward_per_time' , simple_value=np.mean(rewards) )
 
                 self.summary_writer.add_summary(summary, policy.global_step.eval())
                 self.summary_writer.flush()
@@ -422,16 +422,21 @@ should be computed.
 
         # discount extrinsic reward for the meta controller
         gamma = 0.99
-        discount_filter = np.array([gamma**i for i in range(len(extrinsic_rewards))])[::-1]
-        extrinsic_reward = np.sum(discount_filter * extrinsic_rewards)
 
-        return self.last_state, extrinsic_reward, terminal_end, None
+        # early rewards are better?
+        #discount_filter = np.array([gamma**i for i in range(len(extrinsic_rewards))])
+        #extrinsic_reward = np.sum(discount_filter * extrinsic_rewards)
+
+        return self.last_state, np.sum(extrinsic_rewards), terminal_end, None
 
     def evaluate(self,sess):
-        # TODO
-        """
+        
+        # TODO: test this
         global_step = sess.run(self.global_step)
+        sess.run(self.meta_sync)
         sess.run(self.sync)
+
+        meta_policy = self.local_meta_network
         policy = self.local_network
         env = self.env
         rewards_stat = []
@@ -439,20 +444,57 @@ should be computed.
         # average over 40 episode?
         for episode in range(40):
             terminal = False
+
             last_state = env.reset()
+            last_meta_state = last_state
             last_features = policy.get_initial_features()
+            last_meta_features = meta_policy.get_initial_features()
+            last_meta_action = np.zeros(36)
+            last_meta_reward = [0]
+            last_action = np.zeros(self.env.action_space.n)
+            last_reward = [0]
             rewards = 0
             length = 0
+
             while not terminal:
-                fetched = policy.act(last_state, *last_features)
-                action, value_, features_ = fetched[0], fetched[1], fetched[2:]
-                state, reward, terminal, info = env.step(action.argmax())
-                if self.visualise:
-                    env.render()
-                length += 1
-                rewards += reward
-                last_state = state
-                last_features = features_
+
+                fetched = meta_policy.act(last_meta_state, last_meta_features[0],
+                                          last_meta_features[1], last_meta_action, last_meta_reward)
+                meta_action, meta_value_, meta_features_ = fetched[0], fetched[1], fetched[2:]
+
+                meta_reward = 0
+                for _ in range(5):
+                    fetched = policy.act(last_state, last_features[0], last_features[1],
+                                     last_action, last_reward, meta_action)
+                    action, value_, features_ = fetched[0], fetched[1], fetched[2:]
+                    state, reward, terminal, info = env.step(action.argmax())
+
+                    if self.visualise:
+                        vis = state - 0.5 * state * goal_patch + 0.5 * goal_patch
+                        vis = cv2.resize(vis, (500,500))
+                        cv2.imshow('img', vis)
+                        cv2.waitKey(10)
+
+                    length += 1
+                    rewards += reward
+                    last_state = state
+                    last_features = features
+                    last_action = action
+                    last_reward = reward_
+                    meta_reward += reward
+
+                    timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')
+                    if terminal or length >= timestep_limit:
+                        terminal = True
+                        break
+
+                last_meta_state = last_state
+                last_meta_features = meta_features_
+                last_meta_action = meta_action
+                last_meta_reward = [meta_reward]
+
+                if terminal:
+                    break
 
             rewards_stat.append(rewards)
             length_stat.append(length)
@@ -463,5 +505,3 @@ should be computed.
         summary.value.add(tag='Eval/Average_Lenght', simple_value=np.mean(length_stat))
         self.summary_writer.add_summary(summary, global_step)
         self.summary_writer.flush()
-        """
-        pass

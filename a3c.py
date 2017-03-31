@@ -162,6 +162,7 @@ should be computed.
         sess.run(self.meta_sync)
 
         terminal_end = False
+        # TODO: tune this too
         num_local_steps = 20
         env = self.env
         policy = self.local_meta_network
@@ -214,6 +215,7 @@ should be computed.
                                  self.last_meta_reward)
 
         # Process rollout
+        # TODO: tune this too!
         gamma = 0.99
         lambda_ = 1.0
         batch_si = np.asarray(states)

@@ -33,6 +33,7 @@ def conv2d(x, num_filters, name, filter_size=(3, 3), stride=(1, 1), pad="SAME", 
                             collections=collections)
         b = tf.get_variable("b", [1, 1, 1, num_filters], initializer=tf.constant_initializer(0.0),
                             collections=collections)
+        # Use dropout here to help prevent overfitting?
         return tf.nn.conv2d(x, w, stride_shape, pad) + b
 
 def linear(x, size, name, initializer=None, bias_init=0):

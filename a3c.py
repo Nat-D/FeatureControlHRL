@@ -25,6 +25,8 @@ should be computed.
 
         self.env = env
         self.task = task
+        self.meta_action_size = 37
+
         worker_device = "/job:worker/task:{}/cpu:0".format(task)
         if test:
            worker_device = "/job:eval/task:{}/cpu:0".format(task)
@@ -33,12 +35,12 @@ should be computed.
                 self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
                 self.global_step = tf.get_variable("global_step", [], tf.int32, initializer=tf.constant_initializer(0, dtype=tf.int32),
                                                    trainable=False)
-                self.meta_network = MetaPolicy(env.observation_space.shape, 36)
+                self.meta_network = MetaPolicy(env.observation_space.shape, self.meta_action_size)
 
         with tf.device(worker_device):
             with tf.variable_scope("local"):
                 self.local_network = pi = LSTMPolicy(env.observation_space.shape, env.action_space.n)
-                self.local_meta_network = meta_pi = MetaPolicy(env.observation_space.shape, 36)
+                self.local_meta_network = meta_pi = MetaPolicy(env.observation_space.shape, self.meta_action_size)
                 pi.global_step = self.global_step
 
             self.ac = tf.placeholder(tf.float32, [None, env.action_space.n], name="ac")
@@ -96,8 +98,7 @@ should be computed.
             ###################################
             ########## META CONTROLLER ########
             ###################################
-
-            self.meta_ac = tf.placeholder(tf.float32, [None, 36], name="meta_ac")
+            self.meta_ac = tf.placeholder(tf.float32, [None, self.meta_action_size], name="meta_ac")
             self.meta_adv = tf.placeholder(tf.float32, [None], name="meta_adv")
             self.meta_r = tf.placeholder(tf.float32, [None], name="meta_r")
 
@@ -149,7 +150,7 @@ should be computed.
         # Initialise Meta controller
         self.last_meta_state = self.env.reset()
         self.last_meta_features = self.local_meta_network.get_initial_features()
-        self.last_meta_action = np.zeros(36)
+        self.last_meta_action = np.zeros(self.meta_action_size)
         self.last_meta_reward = [0]
 
     def process(self, sess):
@@ -294,7 +295,8 @@ should be computed.
         pos_x = idx // 6
         pos_y = idx - 6*pos_x
         goal_patch = np.zeros([84, 84, 3])
-        goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
+        if idx != 37:
+            goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
 
         for _local_step in range(num_local_steps):
             # Take a step
@@ -310,15 +312,13 @@ should be computed.
             # Intrinsic reward
             pixel_changes = (state - self.last_state)**2
             # mean square error normalized by all pixel_changes
-            # TODO: tune this 
+            # TODO: tune this
             intrinsic_reward = 0.05 * np.sum( pixel_changes * goal_patch ) / np.sum( pixel_changes + 1e-5)
 
             # record extrinsic reward
             extrinsic_rewards += [reward]
             # Apply intrinsic reward
             reward += intrinsic_reward
-
-            #TODO: clip the reward? rescale it?
 
             if self.visualise:
                 vis = state - 0.5 * state * goal_patch + 0.5 * goal_patch
@@ -426,8 +426,7 @@ should be computed.
         self.local_steps += 1
 
         # discount extrinsic reward for the meta controller
-        gamma = 0.99
-
+        #gamma = 0.99
         # early rewards are better?
         #discount_filter = np.array([gamma**i for i in range(len(extrinsic_rewards))])
         #extrinsic_reward = np.sum(discount_filter * extrinsic_rewards)
@@ -436,7 +435,6 @@ should be computed.
 
     def evaluate(self,sess):
 
-        # TODO: test this
         global_step = sess.run(self.global_step)
         sess.run(self.meta_sync)
         sess.run(self.sync)
@@ -454,7 +452,7 @@ should be computed.
             last_meta_state = last_state
             last_features = policy.get_initial_features()
             last_meta_features = meta_policy.get_initial_features()
-            last_meta_action = np.zeros(36)
+            last_meta_action = np.zeros(self.meta_action_size)
             last_meta_reward = [0]
             last_action = np.zeros(self.env.action_space.n)
             last_reward = [0]

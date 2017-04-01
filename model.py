@@ -34,7 +34,9 @@ def conv2d(x, num_filters, name, filter_size=(3, 3), stride=(1, 1), pad="SAME", 
         b = tf.get_variable("b", [1, 1, 1, num_filters], initializer=tf.constant_initializer(0.0),
                             collections=collections)
         # Use dropout here to help prevent overfitting?
-        return tf.nn.dropout(tf.nn.conv2d(x, w, stride_shape, pad) + b, keep_prob=0.7, name='dropout_%s' % name)
+        #return tf.nn.dropout(tf.nn.conv2d(x, w, stride_shape, pad) + b, keep_prob=0.7, name='dropout_%s' % name)
+        # Turn out it is better without dropout
+        return tf.nn.conv2d(x, w, stride_shape, pad) + b
 
 def linear(x, size, name, initializer=None, bias_init=0):
     w = tf.get_variable(name + "/w", [x.get_shape()[1], size], initializer=initializer)
@@ -171,7 +173,7 @@ class MetaPolicy(object):
             self.vf = tf.reshape(linear(x, 1, "value", normalized_columns_initializer(1.0)), [-1])
             self.state_out = [lstm_c[:1, :], lstm_h[:1, :]]
 
-            # try logits with 36 actions
+            # try logits with 36 actions + 1 no patch action
             self.logits = linear(x, ac_space, "action", normalized_columns_initializer(0.01))
             self.sample = categorical_sample(self.logits, ac_space)[0, :]
 

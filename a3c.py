@@ -32,14 +32,14 @@ should be computed.
            worker_device = "/job:eval/task:{}/cpu:0".format(task)
         with tf.device(tf.train.replica_device_setter(1, worker_device=worker_device)):
             with tf.variable_scope("global"):
-                self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n)
+                self.network = LSTMPolicy(env.observation_space.shape, env.action_space.n, self.meta_action_size)
                 self.global_step = tf.get_variable("global_step", [], tf.int32, initializer=tf.constant_initializer(0, dtype=tf.int32),
                                                    trainable=False)
                 self.meta_network = MetaPolicy(env.observation_space.shape, self.meta_action_size)
 
         with tf.device(worker_device):
             with tf.variable_scope("local"):
-                self.local_network = pi = LSTMPolicy(env.observation_space.shape, env.action_space.n)
+                self.local_network = pi = LSTMPolicy(env.observation_space.shape, env.action_space.n, self.meta_action_size)
                 self.local_meta_network = meta_pi = MetaPolicy(env.observation_space.shape, self.meta_action_size)
                 pi.global_step = self.global_step
 

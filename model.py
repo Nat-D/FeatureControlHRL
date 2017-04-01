@@ -49,7 +49,7 @@ def categorical_sample(logits, d):
 
 
 class LSTMPolicy(object):
-    def __init__(self, ob_space, ac_space):
+    def __init__(self, ob_space, ac_space, meta_ac_space):
 
         with tf.variable_scope('conv'):
             self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
@@ -65,7 +65,7 @@ class LSTMPolicy(object):
             x = tf.concat([x, prev_action], axis=1)
             x = tf.concat([x, prev_reward], axis=1)
 
-            self.meta_action = meta_action = tf.placeholder(tf.float32, [None, 36], "meta_action")
+            self.meta_action = meta_action = tf.placeholder(tf.float32, [None, meta_ac_space], "meta_action")
 
             # concat
             x = tf.concat([x, meta_action], axis=1)
@@ -126,7 +126,7 @@ class LSTMPolicy(object):
 
 
 class MetaPolicy(object):
-    def __init__(self, ob_space, ac_space = 36):
+    def __init__(self, ob_space, ac_space = 37):
 
         with tf.variable_scope('conv', reuse=True):
             self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))

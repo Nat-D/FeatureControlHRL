@@ -56,6 +56,9 @@ class LSTMPolicy(object):
 
             x = tf.nn.relu( conv2d(x, 16, "l1", [8, 8], [4, 4]) )
             x = tf.nn.relu( conv2d(x, 32, "l2", [4, 4], [2, 2]) )
+            # x is [?, 11, 11, 32]
+            self.conv_feature = tf.reduce_mean(x, axis=[1,2])
+
             x = tf.nn.relu(linear(flatten(x), 256, "hidden",  normalized_columns_initializer(1.0)))
 
             self.prev_action = prev_action = tf.placeholder(tf.float32, [None, ac_space], "prev_a")
@@ -123,6 +126,10 @@ class LSTMPolicy(object):
         return sess.run(self.vf, {self.x: [ob], self.state_in[0]: c,
                         self.state_in[1]: h, self.prev_action: [prev_a],
                         self.prev_reward: [prev_r], self.meta_action: [meta_a]})[0]
+
+    def get_conv_feature(self, ob):
+        sess = tf.get_default_session()
+        return sess.run([self.conv_feature], {self.x: [ob]})
 
 
 class MetaPolicy(object):

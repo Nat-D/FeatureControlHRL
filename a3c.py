@@ -25,7 +25,7 @@ should be computed.
 
         self.env = env
         self.task = task
-        self.meta_action_size = 37
+        self.meta_action_size = 32
 
         worker_device = "/job:worker/task:{}/cpu:0".format(task)
         if test:
@@ -152,6 +152,9 @@ should be computed.
         self.last_meta_features = self.local_meta_network.get_initial_features()
         self.last_meta_action = np.zeros(self.meta_action_size)
         self.last_meta_reward = [0]
+
+        #
+        self.last_conv_feature = np.zeros(self.meta_action_size)
 
     def process(self, sess):
         """
@@ -281,22 +284,15 @@ should be computed.
         prev_rewards = []
         extrinsic_rewards = []
 
-        # move patch(13x13) around with meta_action
-        #goal_patch = np.zeros([84+12,84+12,3]) # with padding
-        #pos_x = int(np.floor(meta_action[0])) + 6 #
-        #pos_y = int(np.floor(meta_action[1])) + 6 #
-        #goal_patch[ pos_x - 6 : pos_x + 7 , pos_y - 6: pos_y + 7, :] = 1
-        #goal_patch = goal_patch[6:6+84, 6:6+84, :] # remove padding
-
         # select patch 1 in 36. each patch is 14x14
         # idx = 6*x + y where x:[0,5], y[0:5], idx:[0,35]
         # x =  idx // 6
         idx = meta_action.argmax()
-        pos_x = idx // 6
-        pos_y = idx - 6*pos_x
-        goal_patch = np.zeros([84, 84, 3])
-        if idx != 37:
-            goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
+        #pos_x = idx // 6
+        #pos_y = idx - 6*pos_x
+        #goal_patch = np.zeros([84, 84, 3])
+        #if idx != 37:
+        #    goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
 
         for _local_step in range(num_local_steps):
             # Take a step
@@ -310,10 +306,18 @@ should be computed.
             reward = min(1, max(-1, reward))
 
             # Intrinsic reward
-            pixel_changes = (state - self.last_state)**2
+            # Pixel control
+            #pixel_changes = (state - self.last_state)**2
             # mean square error normalized by all pixel_changes
-            # TODO: tune this
-            intrinsic_reward = 0.05 * np.sum( pixel_changes * goal_patch ) / np.sum( pixel_changes + 1e-5)
+            #intrinsic_reward = 0.05 * np.sum( pixel_changes * goal_patch ) / np.sum( pixel_changes + 1e-5)
+
+            # Feature control [selectivity (Bengio et al., 2017)]
+            conv_feature = policy.get_conv_feature(state)[0][0]
+            sel = np.abs(conv_feature[idx] - self.last_conv_feature[idx])
+            sel = sel / ( np.sum( np.abs(conv_feature - self.last_conv_feature) ) + 1e-5)
+            self.last_conv_feature = conv_feature
+
+            intrinsic_reward = 0.05 * sel
 
             # record extrinsic reward
             extrinsic_rewards += [reward]

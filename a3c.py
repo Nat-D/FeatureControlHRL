@@ -448,8 +448,8 @@ should be computed.
         env = self.env
         rewards_stat = []
         length_stat = []
-        # average over 40 episode?
-        for episode in range(40):
+        # average over 100 episode?
+        for episode in range(100):
             terminal = False
 
             last_state = env.reset()
@@ -462,8 +462,6 @@ should be computed.
             last_reward = [0]
             rewards = 0
             length = 0
-            goal_patch = np.zeros([84, 84, 3]) # for visualisation
-
 
             while not terminal:
 
@@ -473,13 +471,6 @@ should be computed.
 
                 meta_reward = 0
 
-                if self.visualise:
-                    goal_patch = 0.0 * goal_patch
-                    idx = meta_action.argmax()
-                    pos_x = idx // 6
-                    pos_y = idx - 6*pos_x
-                    goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
-
 
                 for _ in range(20*5):
                     fetched = policy.act(last_state, last_features[0], last_features[1],
@@ -488,8 +479,7 @@ should be computed.
                     state, reward, terminal, info = env.step(action.argmax())
 
                     if self.visualise:
-                        vis = state - 0.5 * state * goal_patch + 0.5 * goal_patch
-                        vis = cv2.resize(vis, (500,500))
+                        vis = cv2.resize(state , (500,500))
                         cv2.imshow('img', vis)
                         cv2.waitKey(10)
 

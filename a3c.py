@@ -130,6 +130,10 @@ should be computed.
         self.length = 0
         self.rewards = 0
 
+        # extension
+        self.last_action = np.zeros(self.env.action_space.n)
+        self.last_reward = [0]
+
     def process(self, sess):
         """
         Every time process is called.
@@ -155,9 +159,14 @@ should be computed.
         terminal= False
         features= []
 
+        # extension
+        prev_actions = []
+        prev_rewards = []
+
         for _ in range(num_local_steps):
             # Take a step
-            fetched = policy.act(self.last_state, *self.last_features)
+            fetched = policy.act(self.last_state, self.last_features[0], self.last_features[1],
+                                 self.last_action, self.last_reward)
             action, value_, features_ = fetched[0], fetched[1], fetched[2:]
             # argmax to convert from one-hot
             state, reward, terminal, info = env.step(action.argmax())
@@ -170,12 +179,18 @@ should be computed.
             rewards += [reward]
             values += [value_]
             features += [self.last_features]
+            # extension
+            prev_actions += [self.last_action]
+            prev_rewards += [self.last_reward]
+
 
             self.length += 1
             self.rewards += reward
 
             self.last_state = state
             self.last_features = features_
+            self.last_action = action
+            self.last_reward = [reward]
 
             if info:
                 summary = tf.Summary()
@@ -196,11 +211,14 @@ should be computed.
                 break
 
         if not terminal_end:
-            r = policy.value(self.last_state, *self.last_features)
+            r = policy.value(self.last_state, self.last_features[0], self.last_features[1],
+                             self.last_action, self.last_reward)
 
         rollout = [states, actions, rewards, values, r, terminal, features]
         batch = process_rollout(rollout, gamma=0.99, lambda_=1.0)
 
+        batch_prev_a = np.asarray(prev_actions)
+        batch_prev_r = np.asarray(prev_rewards)
         # Gradient Calculation
         should_compute_summary = self.task == 0 and self.local_steps % 11 == 0
 
@@ -215,7 +233,9 @@ should be computed.
             self.adv: batch.adv,
             self.r: batch.r,
             self.local_network.state_in[0]: batch.features[0],
-            self.local_network.state_in[1]: batch.features[1]
+            self.local_network.state_in[1]: batch.features[1],
+            self.local_network.prev_action: batch_prev_a,
+            self.local_network.prev_reward: batch_prev_r
         }
 
         fetched = sess.run(fetches, feed_dict=feed_dict)
@@ -232,15 +252,17 @@ should be computed.
         env = self.env
         rewards_stat = []
         length_stat = []
-        # average over 40 episode?
-        for episode in range(40):
+
+        for episode in range(100):
             terminal = False
             last_state = env.reset()
             last_features = policy.get_initial_features()
+            last_action = np.zeros(self.env.action_space.n)
+            last_reward = [0]
             rewards = 0
             length = 0
             while not terminal:
-                fetched = policy.act(last_state, *last_features)
+                fetched = policy.act(last_state, last_features[0], last_features[1], last_action, last_reward)
                 action, value_, features_ = fetched[0], fetched[1], fetched[2:]
                 state, reward, terminal, info = env.step(action.argmax())
                 if self.visualise:
@@ -249,6 +271,8 @@ should be computed.
                 rewards += reward
                 last_state = state
                 last_features = features_
+                last_action = action
+                last_reward = [reward]
 
             rewards_stat.append(rewards)
             length_stat.append(length)

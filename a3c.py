@@ -219,7 +219,6 @@ should be computed.
                                  self.last_meta_reward)
 
         # Process rollout
-        # TODO: tune this too!
         gamma = 0.99
         lambda_ = 1.0
         batch_si = np.asarray(states)
@@ -321,8 +320,10 @@ should be computed.
 
             # record extrinsic reward
             extrinsic_rewards += [reward]
+
             # Apply intrinsic reward
-            reward += intrinsic_reward
+            beta = 0.5
+            reward = beta * reward + (1.0 - beta) * intrinsic_reward
 
             if self.visualise:
                 vis = state - 0.5 * state * goal_patch + 0.5 * goal_patch

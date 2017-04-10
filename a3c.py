@@ -377,7 +377,7 @@ should be computed.
                              self.last_reward, meta_action)
 
         # Process rollout
-        gamma = 0.90 # note that this is different setting to the feature control branch
+        gamma = 0.99 # will use this setting as pixel control will not be main result
         lambda_ = 1.0
         batch_si = np.asarray(states)
         batch_a = np.asarray(actions)

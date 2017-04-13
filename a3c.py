@@ -488,7 +488,7 @@ should be computed.
                         cv2.imshow('img', vis)
                         cv2.waitKey(10)
                     
-
+                    env_reward = reward
                     # clip reward
                     reward = min(1, max(-1, reward))
 
@@ -502,7 +502,7 @@ should be computed.
  
 
                     length += 1
-                    rewards += reward
+                    rewards += env_reward
                     last_state = state
                     last_features = features_
                     last_action = action

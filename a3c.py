@@ -133,7 +133,7 @@ should be computed.
                 tf.summary.scalar("meta_model/var_global_norm", tf.global_norm(meta_pi.var_list))
             ]
             self.meta_summary_op = tf.summary.merge(meta_summary)
-
+            self.beta = 0.5
 
     def start(self, sess, summary_writer):
         self.summary_writer = summary_writer
@@ -322,7 +322,7 @@ should be computed.
             extrinsic_rewards += [reward]
 
             # Apply intrinsic reward
-            beta = 0.5
+            beta = self.beta
             reward = beta * reward + (1.0 - beta) * intrinsic_reward
 
             if self.visualise:
@@ -487,6 +487,8 @@ should be computed.
                         cv2.imshow('img', vis)
                         cv2.waitKey(10)
                     
+                    env_reward = reward
+                    
                     # clip reward
                     reward = min(1, max(-1, reward))
 
@@ -499,12 +501,12 @@ should be computed.
                     intrinsic_reward = 0.05 * sel
 
                     # Apply intrinsic reward
-                    beta = 0.5
+                    beta = self.beta
                     shaped_reward = beta * reward + (1.0 - beta) * intrinsic_reward
 
                      
                     length += 1
-                    rewards += reward
+                    rewards += env_reward
                     last_state = state
                     last_features = features_
                     last_action = action

@@ -463,6 +463,8 @@ should be computed.
             last_reward = [0]
             rewards = 0
             length = 0
+            last_conv_feature = np.zeros(self.meta_action_size)
+
 
             while not terminal:
 
@@ -472,6 +474,7 @@ should be computed.
 
                 meta_reward = 0
 
+                idx = meta_action.argmax()
 
                 for _ in range(20*5):
                     fetched = policy.act(last_state, last_features[0], last_features[1],
@@ -483,13 +486,29 @@ should be computed.
                         vis = cv2.resize(state , (500,500))
                         cv2.imshow('img', vis)
                         cv2.waitKey(10)
+                    
+                    # clip reward
+                    reward = min(1, max(-1, reward))
 
+                    # Feature control [selectivity (Bengio et al., 2017)]
+                    conv_feature = policy.get_conv_feature(state)[0][0]
+                    sel = np.abs(conv_feature[idx] - last_conv_feature[idx])
+                    sel = sel / ( np.sum( np.abs(conv_feature - last_conv_feature) ) + 1e-5)
+                    last_conv_feature = conv_feature
+
+                    intrinsic_reward = 0.05 * sel
+
+                    # Apply intrinsic reward
+                    beta = 0.5
+                    shaped_reward = beta * reward + (1.0 - beta) * intrinsic_reward
+
+                     
                     length += 1
                     rewards += reward
                     last_state = state
                     last_features = features_
                     last_action = action
-                    last_reward = [reward]
+                    last_reward = [shaped_reward]
                     meta_reward += reward
 
                     timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')

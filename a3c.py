@@ -469,12 +469,11 @@ should be computed.
 
                 meta_reward = 0
 
-                if self.visualise:
-                    goal_patch = 0.0 * goal_patch
-                    idx = meta_action.argmax()
-                    pos_x = idx // 6
-                    pos_y = idx - 6*pos_x
-                    goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
+                goal_patch = 0.0 * goal_patch
+                idx = meta_action.argmax()
+                pos_x = idx // 6
+                pos_y = idx - 6*pos_x
+                goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
 
 
                 for _ in range(20*5):
@@ -488,13 +487,26 @@ should be computed.
                         vis = cv2.resize(vis, (500,500))
                         cv2.imshow('img', vis)
                         cv2.waitKey(10)
+                    
+
+                    # clip reward
+                    reward = min(1, max(-1, reward))
+
+                    # Intrinsic reward
+                    pixel_changes = (state - last_state)**2
+                    # mean square error normalized by all pixel_changes
+                    intrinsic_reward = 0.05 * np.sum( pixel_changes * goal_patch ) / np.sum( pixel_changes + 1e-5)
+                    # Apply intrinsic reward
+                    beta = 0.5
+                    shaped_reward = beta * reward + (1.0 - beta) * intrinsic_reward
+ 
 
                     length += 1
                     rewards += reward
                     last_state = state
                     last_features = features_
                     last_action = action
-                    last_reward = [reward]
+                    last_reward = [shaped_reward]
                     meta_reward += reward
 
                     timestep_limit = env.spec.tags.get('wrapper_config.TimeLimit.max_episode_steps')

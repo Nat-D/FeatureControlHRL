@@ -133,7 +133,7 @@ should be computed.
                 tf.summary.scalar("meta_model/var_global_norm", tf.global_norm(meta_pi.var_list))
             ]
             self.meta_summary_op = tf.summary.merge(meta_summary)
-
+            self.beta = 0.5
 
     def start(self, sess, summary_writer):
         self.summary_writer = summary_writer
@@ -317,7 +317,7 @@ should be computed.
             # record extrinsic reward
             extrinsic_rewards += [reward]
             # Apply intrinsic reward
-            beta = 0.5
+            beta = self.beta
             reward = beta * reward + (1.0 - beta) * intrinsic_reward
 
             if self.visualise:
@@ -497,7 +497,7 @@ should be computed.
                     # mean square error normalized by all pixel_changes
                     intrinsic_reward = 0.05 * np.sum( pixel_changes * goal_patch ) / np.sum( pixel_changes + 1e-5)
                     # Apply intrinsic reward
-                    beta = 0.5
+                    beta = self.beta
                     shaped_reward = beta * reward + (1.0 - beta) * intrinsic_reward
  
 

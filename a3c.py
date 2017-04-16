@@ -173,6 +173,7 @@ should be computed.
             if self.visualise:
                 env.render()
 
+            reward = min(1, max(-1, reward))
             # collect the experience
             states += [self.last_state]
             actions += [action]

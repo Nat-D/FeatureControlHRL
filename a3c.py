@@ -60,7 +60,7 @@ should be computed.
             entropy = - tf.reduce_sum(prob_tf * log_prob_tf)
 
             bs = tf.to_float(tf.shape(pi.x)[0])
-            self.loss = pi_loss + 0.5 * vf_loss - entropy * 0.01
+            self.loss = pi_loss + 0.5 * vf_loss - entropy * 0.01 + 0.01 * pi.orthoReg
 
 
             self.visualise = visualise
@@ -73,7 +73,8 @@ should be computed.
                 tf.summary.scalar("model/entropy", entropy / bs),
                 tf.summary.image("model/state", pi.x),
                 tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads)),
-                tf.summary.scalar("model/var_global_norm", tf.global_norm(pi.var_list))
+                tf.summary.scalar("model/var_global_norm", tf.global_norm(pi.var_list)),
+                tf.summary.scalar("model/orthoReg", pi.orthoReg )
                 ]
 
             self.summary_op = tf.summary.merge(actor_summary)
@@ -133,7 +134,7 @@ should be computed.
                 tf.summary.scalar("meta_model/var_global_norm", tf.global_norm(meta_pi.var_list))
             ]
             self.meta_summary_op = tf.summary.merge(meta_summary)
-            self.beta = 0.5
+            self.beta = 0.75
 
     def start(self, sess, summary_writer):
         self.summary_writer = summary_writer
@@ -486,9 +487,9 @@ should be computed.
                         vis = cv2.resize(state , (500,500))
                         cv2.imshow('img', vis)
                         cv2.waitKey(10)
-                    
+
                     env_reward = reward
-                    
+
                     # clip reward
                     reward = min(1, max(-1, reward))
 
@@ -504,7 +505,7 @@ should be computed.
                     beta = self.beta
                     shaped_reward = beta * reward + (1.0 - beta) * intrinsic_reward
 
-                     
+
                     length += 1
                     rewards += env_reward
                     last_state = state

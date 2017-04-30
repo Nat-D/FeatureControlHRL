@@ -33,10 +33,10 @@ def conv2d(x, num_filters, name, filter_size=(3, 3), stride=(1, 1), pad="SAME", 
                             collections=collections)
         b = tf.get_variable("b", [1, 1, 1, num_filters], initializer=tf.constant_initializer(0.0),
                             collections=collections)
-        # Use dropout here to help prevent overfitting?
-        #return tf.nn.dropout(tf.nn.conv2d(x, w, stride_shape, pad) + b, keep_prob=0.7, name='dropout_%s' % name)
-        # Turn out it is better without dropout
-        return tf.nn.conv2d(x, w, stride_shape, pad) + b
+
+        # collect weight for regularisation
+
+        return tf.nn.conv2d(x, w, stride_shape, pad) + b, w
 
 def linear(x, size, name, initializer=None, bias_init=0):
     w = tf.get_variable(name + "/w", [x.get_shape()[1], size], initializer=initializer)
@@ -47,6 +47,27 @@ def categorical_sample(logits, d):
     value = tf.squeeze(tf.multinomial(logits - tf.reduce_max(logits, [1], keep_dims=True), 1), [1])
     return tf.one_hot(value, d)
 
+def orthoReg(w):
+    # regularise w2 to be orthogonal
+    # L = sum_{w,w'} log(1 + exp( l * (cos(w,w') - 1) ))
+    # [4, 4, 16, 32]
+
+    w_new = tf.reshape(w, [-1, 32])
+
+    # normalized w
+    norm = tf.sqrt(tf.reduce_sum(tf.square(w_new), 1, keep_dims=True))
+    w_new = w_new / ( norm + 1e-10 )
+
+    # compute product
+    prod = tf.matmul( tf.transpose(w_new), w_new )
+
+    L = tf.log( 1 + tf.exp(10 * (prod - 1) ))
+    diag_mat = tf.diag(tf.diag_part(L))
+    L = L - diag_mat
+    Loss = tf.reduce_sum( tf.reduce_sum(L) )
+
+    return Loss
+
 
 class LSTMPolicy(object):
     def __init__(self, ob_space, ac_space, meta_ac_space):
@@ -54,8 +75,14 @@ class LSTMPolicy(object):
         with tf.variable_scope('conv'):
             self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
 
-            x = tf.nn.relu( conv2d(x, 16, "l1", [8, 8], [4, 4]) )
-            x = tf.nn.relu( conv2d(x, 32, "l2", [4, 4], [2, 2]) )
+            x, w1 = conv2d(x, 16, "l1", [8, 8], [4, 4])
+            x = tf.nn.relu(x)
+            x, w2 = conv2d(x, 32, "l2", [4, 4], [2, 2])
+            x = tf.nn.relu(x)
+
+            self.orthoReg = orthoReg(w2)
+
+
             # x is [?, 11, 11, 32]
             self.conv_feature = tf.reduce_mean(x, axis=[1,2])
 
@@ -134,8 +161,11 @@ class MetaPolicy(object):
         with tf.variable_scope('conv', reuse=True):
             self.x = x = tf.placeholder(tf.float32, [None] + list(ob_space))
 
-            x = tf.nn.relu( conv2d(x, 16, "l1", [8, 8], [4, 4]) )
-            x = tf.nn.relu( conv2d(x, 32, "l2", [4, 4], [2, 2]) )
+            x, w1 = conv2d(x, 16, "l1", [8, 8], [4, 4])
+            x = tf.nn.relu(x)
+            x, w2 = conv2d(x, 32, "l2", [4, 4], [2, 2])
+            x = tf.nn.relu(x)
+
             x = tf.nn.relu(linear(flatten(x), 256, "hidden",  normalized_columns_initializer(1.0)))
 
             self.prev_action = prev_action = tf.placeholder(tf.float32, [None, ac_space], "prev_a")

@@ -35,7 +35,7 @@ def conv2d(x, num_filters, name, filter_size=(3, 3), stride=(1, 1), pad="SAME", 
                             collections=collections)
 
         # collect weight for regularisation
-
+        # return tf.nn.dropout(tf.nn.conv2d(x, w, stride_shape, pad) + b, keep_prob=0.7, name='dropout_%s' % name)
         return tf.nn.conv2d(x, w, stride_shape, pad) + b, w
 
 def linear(x, size, name, initializer=None, bias_init=0):
@@ -80,7 +80,7 @@ class LSTMPolicy(object):
             x, w2 = conv2d(x, 32, "l2", [4, 4], [2, 2])
             x = tf.nn.relu(x)
 
-            self.orthoReg = orthoReg(w2)
+            self.orthoReg = orthoReg(w2) + orthoReg(w1)
 
 
             # x is [?, 11, 11, 32]

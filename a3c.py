@@ -133,7 +133,7 @@ should be computed.
                 tf.summary.scalar("meta_model/var_global_norm", tf.global_norm(meta_pi.var_list))
             ]
             self.meta_summary_op = tf.summary.merge(meta_summary)
-            self.beta = 0.5
+            self.beta = 0.75
 
     def start(self, sess, summary_writer):
         self.summary_writer = summary_writer

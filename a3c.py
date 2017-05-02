@@ -61,7 +61,7 @@ should be computed.
 
             bs = tf.to_float(tf.shape(pi.x)[0])
             # orthoReg give NaN if weight 0.0001 ?
-            self.loss = pi_loss + 0.5 * vf_loss - entropy * 0.01 
+            self.loss = pi_loss + 0.5 * vf_loss - entropy * 0.01
 
 
             self.visualise = visualise
@@ -148,6 +148,8 @@ should be computed.
         self.last_reward = [0]
         self.length = 0
         self.rewards = 0
+        self.ex_rewards = 0
+        self.in_rewards = 0
 
         # Initialise Meta controller
         self.last_meta_state = self.env.reset()
@@ -322,7 +324,8 @@ should be computed.
 
             # record extrinsic reward
             extrinsic_rewards += [reward]
-
+            self.ex_rewards += reward
+            self.in_rewards += intrinsic_reward
             # Apply intrinsic reward
             beta = self.beta
             reward = beta * reward + (1.0 - beta) * intrinsic_reward
@@ -371,11 +374,16 @@ should be computed.
                 summary = tf.Summary()
                 summary.value.add(tag='global/episode_shaped_reward', simple_value=self.rewards)
                 summary.value.add(tag='global/shaped_reward_per_time', simple_value=self.rewards/self.length)
+                summary.value.add(tag='global/episode_extrinsic_reward', simple_value=self.ex_rewards)
+                summary.value.add(tag='global/episode_intrinsic_reward', simple_value=self.in_rewards)
+
                 self.summary_writer.add_summary(summary, policy.global_step.eval())
                 self.summary_writer.flush()
 
                 self.length = 0
                 self.rewards = 0
+                self.ex_rewards = 0
+                self.in_rewards = 0
                 break
 
         if not terminal_end:

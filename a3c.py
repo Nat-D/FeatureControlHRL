@@ -75,7 +75,7 @@ should be computed.
                 tf.summary.image("model/state", pi.x),
                 tf.summary.scalar("model/grad_global_norm", tf.global_norm(grads)),
                 tf.summary.scalar("model/var_global_norm", tf.global_norm(pi.var_list)),
-                tf.summary.scalar("model/orthoReg", pi.orthoReg )
+                #tf.summary.scalar("model/orthoReg", pi.orthoReg )
                 ]
 
             self.summary_op = tf.summary.merge(actor_summary)

@@ -60,7 +60,8 @@ should be computed.
             entropy = - tf.reduce_sum(prob_tf * log_prob_tf)
 
             bs = tf.to_float(tf.shape(pi.x)[0])
-            self.loss = pi_loss + 0.5 * vf_loss - entropy * 0.01 + 0.0001 * pi.orthoReg
+            # orthoReg give NaN if weight 0.0001 ?
+            self.loss = pi_loss + 0.5 * vf_loss - entropy * 0.01 + 0.001 * pi.orthoReg
 
 
             self.visualise = visualise

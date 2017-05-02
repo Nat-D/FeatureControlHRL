@@ -146,6 +146,9 @@ should be computed.
         self.last_reward = [0]
         self.length = 0
         self.rewards = 0
+        self.ex_rewards = 0
+        self.in_rewards = 0
+
 
         # Initialise Meta controller
         self.last_meta_state = self.env.reset()
@@ -320,6 +323,8 @@ should be computed.
 
             # record extrinsic reward
             extrinsic_rewards += [reward]
+            self.ex_rewards += reward
+            self.in_rewards += intrinsic_reward
 
             # Apply intrinsic reward
             beta = self.beta
@@ -369,11 +374,17 @@ should be computed.
                 summary = tf.Summary()
                 summary.value.add(tag='global/episode_shaped_reward', simple_value=self.rewards)
                 summary.value.add(tag='global/shaped_reward_per_time', simple_value=self.rewards/self.length)
+                summary.value.add(tag='global/episode_extrinsic_reward', simple_value=self.ex_rewards)
+                summary.value.add(tag='global/episode_intrinsic_reward', simple_value=self.in_rewards)
+
                 self.summary_writer.add_summary(summary, policy.global_step.eval())
                 self.summary_writer.flush()
 
                 self.length = 0
                 self.rewards = 0
+                self.ex_rewards = 0
+                self.in_rewards = 0
+
                 break
 
         if not terminal_end:
@@ -486,9 +497,9 @@ should be computed.
                         vis = cv2.resize(state , (500,500))
                         cv2.imshow('img', vis)
                         cv2.waitKey(10)
-                    
+
                     env_reward = reward
-                    
+
                     # clip reward
                     reward = min(1, max(-1, reward))
 
@@ -504,7 +515,7 @@ should be computed.
                     beta = self.beta
                     shaped_reward = beta * reward + (1.0 - beta) * intrinsic_reward
 
-                     
+
                     length += 1
                     rewards += env_reward
                     last_state = state

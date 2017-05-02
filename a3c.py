@@ -61,7 +61,7 @@ should be computed.
 
             bs = tf.to_float(tf.shape(pi.x)[0])
             # orthoReg give NaN if weight 0.0001 ?
-            self.loss = pi_loss + 0.5 * vf_loss - entropy * 0.01 + 0.001 * pi.orthoReg
+            self.loss = pi_loss + 0.5 * vf_loss - entropy * 0.01 
 
 
             self.visualise = visualise

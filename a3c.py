@@ -270,6 +270,7 @@ should be computed.
                     env.render()
                 length += 1
                 rewards += reward
+                reward = max(-1, min( reward, 1))
                 last_state = state
                 last_features = features_
                 last_action = action

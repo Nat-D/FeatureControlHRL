@@ -147,7 +147,7 @@ should be computed.
 
         # Environment run for 20 steps or less
         terminal_end = False
-        num_local_steps = 20
+        num_local_steps = 100#20
         env = self.env
         policy = self.local_network
 

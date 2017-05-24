@@ -95,6 +95,13 @@ should be computed.
             self.summary_writer = None
             self.local_steps = 0
 
+
+            # sync target ops, copy weight from main network to the target network
+            self.target_sync = tf.group(
+                *(
+                    [ v1.assign(v2) for v1, v2 in zip(pi.target_var_list, self.network.conv_var_list)]
+                 ))
+
             ###################################
             ########## META CONTROLLER ########
             ###################################
@@ -160,6 +167,16 @@ should be computed.
         self.last_conv_feature = np.zeros(self.meta_action_size)
 
     def process(self, sess):
+        # sync target network
+        sess.run(self.target_sync)
+
+        num_local_steps = 5
+        # run 10000 steps before each target sync
+        for _local_step in range(num_local_steps):
+            # run 2000 time step
+            self.meta_process(sess)
+
+    def meta_process(self, sess):
         """
         Everytime process is called.
         The meta_network get sync.
@@ -286,15 +303,7 @@ should be computed.
         prev_rewards = []
         extrinsic_rewards = []
 
-        # select patch 1 in 36. each patch is 14x14
-        # idx = 6*x + y where x:[0,5], y[0:5], idx:[0,35]
-        # x =  idx // 6
         idx = meta_action.argmax()
-        #pos_x = idx // 6
-        #pos_y = idx - 6*pos_x
-        #goal_patch = np.zeros([84, 84, 3])
-        #if idx != 37:
-        #    goal_patch[ 14 * pos_x: 14 * (pos_x + 1) + 1, 14*pos_y: 14*(pos_y+1) +1 ] = 1
 
         for _local_step in range(num_local_steps):
             # Take a step
@@ -306,12 +315,6 @@ should be computed.
 
             # clip reward
             reward = min(1, max(-1, reward))
-
-            # Intrinsic reward
-            # Pixel control
-            #pixel_changes = (state - self.last_state)**2
-            # mean square error normalized by all pixel_changes
-            #intrinsic_reward = 0.05 * np.sum( pixel_changes * goal_patch ) / np.sum( pixel_changes + 1e-5)
 
             # Feature control [selectivity (Bengio et al., 2017)]
             conv_feature = policy.get_conv_feature(state)[0][0]

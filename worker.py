@@ -81,6 +81,7 @@ def run(args, server):
 
         sess.run(trainer.meta_sync)
         sess.run(trainer.sync)
+        sess.run(trainer.target_sync)
 
         trainer.start(sess, summary_writer)
         global_step = sess.run(trainer.global_step)

@@ -22,8 +22,8 @@
 # Getting Started
 
 ```
-conda create --name universe-starter-agent 
-source activate universe-starter-agent
+conda create --name env 
+source activate env
 
 brew install tmux htop cmake      # On Linux use sudo apt-get install -y tmux htop cmake
 
@@ -36,7 +36,7 @@ conda install -y numpy
 conda install -y scipy
 ```
 Add the following to your `.bashrc` so that you'll have the correct environment when the `train.py` script spawns new bash shells
-```source activate universe-starter-agent```
+```source activate env```
 
 
 # Abstract
@@ -65,5 +65,5 @@ To change the value of beta, edit line 136 of a3c.py to the value of beta we wan
 ![ex3](https://github.com/Nat-D/FeatureControlHRL/blob/master/imgs/fig3.png "Results of experiment 3")
 
 In this experiment, we improve performance by changing the BPTT length from 20 to 100.
-In order to run experiments with BPTT = 100, checkout branch feature_control_bptt100
+In order to run experiments with BPTT = 100, checkout branch feature_control_bptt100. For baseline agent, checkout branch baseline. All the experiments used 8 asynchronous workers.
 

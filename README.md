@@ -45,4 +45,25 @@ Add the following to your `.bashrc` so that you'll have the correct environment 
   
 # Reproducing the results
 
-TODO
+## Experiment 1: Influence of the meta-controller on performance
+
+![ex1](https://github.com/Nat-D/FeatureControlHRL/blob/master/imgs/fig1.png "Results of experiment 1")
+
+In this experiment, we evaluated the performance of the pixel-control agent (top row) and the feature-control agent (bottom row).
+To reproduce the results, checkout to branch pixel_control for pixel-control agent and feature_control for feature-control agent.
+For example, use the following command for Montezuma's Revenge:
+
+    python train.py -w 8 -e MontezumaRevenge-v0 -l ~/experiments/montezuma_experiment
+
+To change the value of beta, edit line 136 of a3c.py to the value of beta we want. For example, for beta = 0.75:
+
+    self.beta = 0.75
+
+## Experiment 2, 3: With different backpropagation through time (BPTT) length
+
+![ex2](https://github.com/Nat-D/FeatureControlHRL/blob/master/imgs/fig2.png "Results of experiment 2")
+![ex3](https://github.com/Nat-D/FeatureControlHRL/blob/master/imgs/fig3.png "Results of experiment 3")
+
+In this experiment, we improve performance by changing the BPTT length from 20 to 100.
+In order to run experiments with BPTT = 100, checkout branch feature_control_bptt100
+

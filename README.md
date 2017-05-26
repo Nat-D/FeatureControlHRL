@@ -7,7 +7,7 @@
 
 # Dependencies
 
-* Python 2.7 or 3.5
+* Python 2.7
 * [six](https://pypi.python.org/pypi/six) (for py2/3 compatibility)
 * [TensorFlow](https://www.tensorflow.org/) 
 * [tmux](https://tmux.github.io/) (the start script opens up a tmux session with multiple windows)
@@ -22,7 +22,7 @@
 # Getting Started
 
 ```
-conda create --name universe-starter-agent python=3.5
+conda create --name universe-starter-agent 
 source activate universe-starter-agent
 
 brew install tmux htop cmake      # On Linux use sudo apt-get install -y tmux htop cmake

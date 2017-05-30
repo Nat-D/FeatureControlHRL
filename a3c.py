@@ -141,6 +141,8 @@ should be computed.
             ]
             self.meta_summary_op = tf.summary.merge(meta_summary)
             self.beta = 0.75
+            self.num_sub_loop_per_meta_loop = 1
+            self.sub_bptt = 100
 
     def start(self, sess, summary_writer):
         self.summary_writer = summary_writer
@@ -201,6 +203,8 @@ should be computed.
         prev_actions = []
         prev_rewards = []
 
+        num_sub_loop_per_meta_loop = self.num_sub_loop_per_meta_loop
+
         for _local_step in range(num_local_steps):
             fetched = policy.act(self.last_meta_state, self.last_meta_features[0],
                                  self.last_meta_features[1], self.last_meta_action,
@@ -210,7 +214,7 @@ should be computed.
             reward = 0
             # run actors several times
             # TODO: tune this ... 2? maybe
-            for _ in range(5):
+            for _ in range(num_sub_loop_per_meta_loop):
                 state, reward_, terminal, info = self.actor_process(sess, action)
                 reward += reward_
                 if terminal:
@@ -288,7 +292,7 @@ should be computed.
 
         # Environment run for 20 steps or less
         terminal_end = False
-        num_local_steps = 20
+        num_local_steps = self.sub_bptt
         env = self.env
         policy = self.local_network
 
@@ -490,7 +494,7 @@ should be computed.
 
                 idx = meta_action.argmax()
 
-                for _ in range(20*5):
+                for _ in range(self.sub_bptt*self.num_sub_loop_per_meta_loop):
                     fetched = policy.act(last_state, last_features[0], last_features[1],
                                      last_action, last_reward, meta_action)
                     action, value_, features_ = fetched[0], fetched[1], fetched[2:]

@@ -9,7 +9,7 @@
 
 * Python 2.7
 * [six](https://pypi.python.org/pypi/six) (for py2/3 compatibility)
-* [TensorFlow](https://www.tensorflow.org/) 
+* [TensorFlow](https://www.tensorflow.org/)
 * [tmux](https://tmux.github.io/) (the start script opens up a tmux session with multiple windows)
 * [htop](https://hisham.hm/htop/) (shown in one of the tmux windows)
 * [gym](https://pypi.python.org/pypi/gym)
@@ -22,7 +22,7 @@
 # Getting Started
 
 ```
-conda create --name env 
+conda create --name env
 source activate env
 
 brew install tmux htop cmake      # On Linux use sudo apt-get install -y tmux htop cmake
@@ -42,7 +42,7 @@ Add the following to your `.bashrc` so that you'll have the correct environment 
 # Abstract
 
   The problem of sparse rewards is one of the hardest challenges in contemporary reinforcement learning. Hierarchical reinforcement learning (HRL) tackles this problem by using a set of temporally-extended actions, or options, each of which has its own subgoal. These subgoals are normally handcrafted for specific tasks. Here, though, we introduce a generic class of subgoals with broad applicability in the visual domain. Underlying our approach (in common with work using "auxiliary tasks") is the hypothesis that the ability to control aspects of the environment is an inherently useful skill to have. We incorporate such subgoals in an end-to-end hierarchical reinforcement learning system and test two variants of our algorithm on a number of games from the Atari suite. We highlight the advantage of our approach in one of the hardest games -- Montezuma's revenge -- for which the ability to handle sparse rewards is key. Our agent learns several times faster than the current state-of-the-art HRL agent in this game, reaching a similar level of performance.
-  
+
 # Reproducing the results
 
 ## Experiment 1: Influence of the meta-controller on performance
@@ -67,3 +67,9 @@ To change the value of beta, edit line 136 of a3c.py to the value of beta we wan
 In this experiment, we improve performance by changing the BPTT length from 20 to 100.
 In order to run experiments with BPTT = 100, checkout branch feature_control_bptt100. For baseline agent, checkout branch baseline. All the experiments used 8 asynchronous workers.
 
+## Extra: Improve stability with target network
+
+![ex4](https://github.com/Nat-D/FeatureControlHRL/blob/master/imgs/fig4.png "Results of extra experiment")
+
+In this experiment, we further improve stability of the training by using a target network similar to DQN to calculate the intrinsic reward of the feature control agent.
+To run the experiment, checkout branch target.

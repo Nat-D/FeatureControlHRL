@@ -4,6 +4,13 @@
   by Nat Dilokthanakul, Christos Kaplanis, Nick Pawlowski, Murray Shanahan (https://arxiv.org/abs/1705.06769)
 
   We adapted the code from an open-source implementation of A3C, namely, “Universe-StarterAgent”. (https://github.com/openai/universe-starter-agent)
+  
+# UPDATE NOTE:
+
+We later found that a flat A3C agent trained with shaped reward according to equation 3 can perform as well as our feature-control agent in Montezuma Revenge. This result supports the claim that additional auxiliary rewards or loss signals can be beneficial when dealing with sparse reward environments even though the reward can possibly skew the definition of its task.
+
+Importantly, this raises a question about the benefit of having the hierarchical elements proposed in this paper. It appears that decisions made by the meta-controller do not significantly contribute to the success of feature-control agent.
+  
 
 # Dependencies
 
